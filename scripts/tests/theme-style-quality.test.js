@@ -6,6 +6,16 @@ const postcss = require('postcss');
 const sassRoot = path.resolve(process.env.THEME_ROOT || path.resolve(__dirname, '../..'), 'src/sass');
 const css = postcss.parse(sass.compile(path.join(sassRoot, 'style.scss'), {style: 'compressed', silenceDeprecations: ['import']}).css);
 
+test('footer network navigation retains its flex layout without the blocked selector', () => {
+  let layout;
+  css.walkRules(rule => {
+    assert.notEqual(rule.selector, '.footer-social');
+    if (rule.selector === '.footer-network-links') layout = rule;
+  });
+  assert.ok(layout, 'Missing footer network layout');
+  assert.ok(layout.nodes.some(node => node.type === 'decl' && node.prop === 'display' && node.value === 'flex'));
+});
+
 test('bookmark containers have one unambiguous minimum height per rule', () => {
   let checked = 0;
   css.walkRules(rule => {

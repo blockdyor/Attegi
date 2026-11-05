@@ -37,12 +37,35 @@ function renderer() {
   return hbs;
 }
 
-function renderTemplate(hbs, name, context, site = {}, member = null) {
+function renderTemplate(hbs, name, context, site = {}, member = null, custom = {}) {
   hbs.templates[name] ||= hbs.compile(fs.readFileSync(path.join(themeRoot, name), 'utf8'));
   return hbs.templates[name](context, {
-    data: {site, member, custom: {color_scheme: 'System'}}
+    data: {site, member, custom: {color_scheme: 'System', ...custom}}
   });
 }
+
+function renderFooterLinks() {
+  const site = {url: 'https://example.com', ...Object.fromEntries(networks.map(key => [key, 'account']))};
+  const custom = {github_url: 'https://github.com/example', telegram_url: 'https://t.me/example', discord_url: 'https://discord.gg/example', email_address: 'hello@example.com'};
+  const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, site, null, custom);
+  const group = html.match(/<div class="(footer-(?:social|network-links))">([\s\S]*?)<\/div>/);
+  assert.ok(group, 'Missing footer link group');
+  return {className: group[1], html: group[2]};
+}
+
+test('ordinary footer navigation does not match Fanboy’s generic social-wrapper filter', () => {
+  // Fanboy source: fanboy-addon/fanboy_social_general_hide.txt, rule ##.footer-social.
+  assert.notEqual(renderFooterLinks().className, 'footer-social');
+});
+
+test('footer links retain every label and self-contained inline SVG', () => {
+  const html = renderFooterLinks().html;
+  const labels = Array.from(html.matchAll(/<a\b[^>]*aria-label="([^"]+)"/g), match => match[1]);
+  const expected = ['RSS', 'X', 'Facebook', 'LinkedIn', 'Bluesky', 'Threads', 'Mastodon', 'TikTok', 'YouTube', 'Instagram', 'GitHub', 'Telegram', 'Discord', 'Email'];
+  assert.deepEqual(labels.toSorted(), expected.toSorted());
+  assert.equal((html.match(/<svg\b/g) || []).length, expected.length);
+  assert.doesNotMatch(html, /<(?:img|image|use|script|iframe)\b[^>]*(?:src|href)=/i);
+});
 
 for (const network of networks) {
   test(`footer and error shell render with ${network} configured`, () => {
