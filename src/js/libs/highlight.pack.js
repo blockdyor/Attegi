@@ -421,7 +421,7 @@ end:/(\w+)/,className:"string"})]}},o={className:"string",begin:/"/,end:/"/,
 contains:[e.BACKSLASH_ESCAPE,t,i]};i.contains.push(o);const c={begin:/\$?\(\(/,
 end:/\)\)/,contains:[{begin:/\d+#[0-9a-f]+/,className:"number"},e.NUMBER_MODE,t]
 },l=e.SHEBANG({binary:"(fish|bash|zsh|sh|csh|ksh|tcsh|dash|scsh)",relevance:10
-}),d={className:"function",begin:/\w[\w\d_]*\s*\(\s*\)\s*\{/,returnBegin:!0,
+}),d={className:"function",begin:/\b\w[\w\d_]*\s*\(\s*\)\s*\{/,returnBegin:!0,
 contains:[e.inherit(e.TITLE_MODE,{begin:/\w[\w\d_]*/})],relevance:0};return{
 name:"Bash",aliases:["sh","zsh"],keywords:{$pattern:/\b[a-z][a-z0-9._-]+\b/,
 keyword:["if","then","else","elif","fi","time","for","while","until","in","do","done","case","esac","coproc","function","select"],
@@ -1191,7 +1191,7 @@ variants:[{begin:/\b\d[\d_]*((\.[\d_]+(E[+-]?[\d_]+)?)|(E[+-]?[\d_]+))[RFD@!#]?/
 },{begin:/\b\d[\d_]*((U?[SIL])|[%&])?/},{begin:/&H[\dA-F_]+((U?[SIL])|[%&])?/},{
 begin:/&O[0-7_]+((U?[SIL])|[%&])?/},{begin:/&B[01_]+((U?[SIL])|[%&])?/}]},{
 className:"label",begin:/^\w+:/},o,c,{className:"meta",
-begin:/[\t ]*#(const|disable|else|elseif|enable|end|externalsource|if|region)\b/,
+begin:/^[\t ]*#(const|disable|else|elseif|enable|end|externalsource|if|region)\b/,
 end:/$/,keywords:{
 keyword:"const disable else elseif enable end externalsource if region then"},
 contains:[c]}]}},grmr_wasm:e=>{const n=e.COMMENT(/\(;/,/;\)/)
