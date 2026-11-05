@@ -875,6 +875,12 @@ textarea {
 		height: auto;
 		margin: 1.5em 0;
 		border-radius: var(--radius-md);
+
+		// Inline banners reserve their space in a positioned wrapper, not image margins.
+		&[style*="position: absolute"],
+		&[style*="position:absolute"] {
+			margin: 0;
+		}
 	}
 
 	/* Enhanced Video Responsive Support (Reframe-style) */
