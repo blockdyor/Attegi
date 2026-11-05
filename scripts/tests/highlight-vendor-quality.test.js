@@ -1,4 +1,4 @@
-import { test, expect } from 'bun:test';
+import { test, expect, beforeAll } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -10,20 +10,9 @@ const source = readFileSync(new URL(file, root), 'utf8');
 // Inverse excerpts avoid duplicating the entire vendor and work in shallow CI clones.
 // The pinned hash ensures the oracle is the exact actual pre-patch bundle, not a simulation.
 const fixture = JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json', import.meta.url), 'utf8'));
-let baseline = source;
-for (const { start, end, source: original } of fixture.originalFunctions) {
-    const from = baseline.indexOf(start), to = baseline.indexOf(end, from);
-    assert(from >= 0 && to > from, `Missing baseline boundary: ${start}`);
-    baseline = baseline.slice(0, from) + original + baseline.slice(to);
-}
-baseline = baseline.replaceAll('.sort((a,b)=>a<b?-1:a>b?1:0).reverse()', '.sort().reverse()')
-    .replace('grmr_wasm:e=>{const', 'grmr_wasm:e=>{e.regex;const')
-    .replace('h=_.concat([{begin:/\\(/', 'h=_.concat([{begin:/(\\s*)\\(/')
-    .replace('  Attegi local maintenance: statement-form mode transforms, explicit UTF-16\n' +
-        '  string sorting, and removal of an unused WASM regex data-property read.\n' +
-        '  Based on upstream 11.12.0; not byte-identical. Recursive JS parameter scan repaired.\n', '');
-assert.equal(createHash('sha256').update(baseline).digest('hex'), fixture.sha256,
-    'Inverse excerpts must reconstruct the exact pre-maintenance bundle');
+let baseline;
+let before;
+let after;
 const plain = value => JSON.parse(JSON.stringify(value));
 function load(text) {
     const context = vm.createContext({ console });
@@ -35,8 +24,25 @@ function load(text) {
     vm.runInContext(text, context);
     return { api: context.hljs, sorts: plain(context.sorts), context };
 }
-const before = load(baseline);
-const after = load(source);
+
+beforeAll(() => {
+    baseline = source;
+    for (const { start, end, source: original } of fixture.originalFunctions) {
+        const from = baseline.indexOf(start), to = baseline.indexOf(end, from);
+        assert(from >= 0 && to > from, `Missing baseline boundary: ${start}`);
+        baseline = baseline.slice(0, from) + original + baseline.slice(to);
+    }
+    baseline = baseline.replaceAll('.sort((a,b)=>a<b?-1:a>b?1:0).reverse()', '.sort().reverse()')
+        .replace('grmr_wasm:e=>{const', 'grmr_wasm:e=>{e.regex;const')
+        .replace('h=_.concat([{begin:/\\(/', 'h=_.concat([{begin:/(\\s*)\\(/')
+        .replace('  Attegi local maintenance: statement-form mode transforms, explicit UTF-16\n' +
+            '  string sorting, and removal of an unused WASM regex data-property read.\n' +
+            '  Based on upstream 11.12.0; not byte-identical. Recursive JS parameter scan repaired.\n', '');
+    assert.equal(createHash('sha256').update(baseline).digest('hex'), fixture.sha256,
+        'Inverse excerpts must reconstruct the exact pre-maintenance bundle');
+    before = load(baseline);
+    after = load(source);
+});
 
 test('S905: the five mode mutations use statements and WASM has no discarded regex read', () => {
     // Acceptance diagnostic for statement form, not a claim of an old functional bug.
