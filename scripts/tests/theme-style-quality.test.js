@@ -14,6 +14,7 @@ test('footer network navigation retains its flex layout without the blocked sele
   });
   assert.ok(layout, 'Missing footer network layout');
   assert.ok(layout.nodes.some(node => node.type === 'decl' && node.prop === 'display' && node.value === 'flex'));
+  assert.ok(layout.nodes.some(node => node.type === 'decl' && node.prop === 'flex-wrap' && node.value === 'wrap'), 'Additional footer links must wrap instead of extending the row');
 });
 
 test('bookmark containers have one unambiguous minimum height per rule', () => {

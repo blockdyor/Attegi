@@ -3531,6 +3531,7 @@ textarea {
 /* Footer Right (Social + Theme Toggle) */
 .footer-right {
 	display: flex;
+	max-width: 100%;
 	align-items: center;
 	gap: var(--space-1);
 	flex: 1;
@@ -3553,7 +3554,9 @@ textarea {
 /* Social Links */
 .footer-network-links {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
+	justify-content: inherit;
 	gap: 0;
 }
 

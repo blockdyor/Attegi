@@ -103,6 +103,18 @@
       "github_url": {
         "type": "text"
       },
+      "nostr_url": {
+        "type": "text",
+        "description": "Optional Nostr profile URL or nostr: URI displayed in the footer."
+      },
+      "amboss_url": {
+        "type": "text",
+        "description": "Optional Amboss node or profile URL displayed in the footer."
+      },
+      "mempool_url": {
+        "type": "text",
+        "description": "Optional Mempool.space explorer or Lightning node URL displayed in the footer."
+      },
       "telegram_url": {
         "type": "text"
       },

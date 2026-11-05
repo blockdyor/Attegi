@@ -44,9 +44,9 @@ function renderTemplate(hbs, name, context, site = {}, member = null, custom = {
   });
 }
 
-function renderFooterLinks() {
+function renderFooterLinks(extraCustom = {}) {
   const site = {url: 'https://example.com', ...Object.fromEntries(networks.map(key => [key, 'account']))};
-  const custom = {github_url: 'https://github.com/example', telegram_url: 'https://t.me/example', discord_url: 'https://discord.gg/example', email_address: 'hello@example.com'};
+  const custom = {github_url: 'https://github.com/example', telegram_url: 'https://t.me/example', discord_url: 'https://discord.gg/example', email_address: 'hello@example.com', ...extraCustom};
   const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, site, null, custom);
   const group = html.match(/<div class="(footer-(?:social|network-links))">([\s\S]*?)<\/div>/);
   assert.ok(group, 'Missing footer link group');
@@ -65,6 +65,47 @@ test('footer links retain every label and self-contained inline SVG', () => {
   assert.deepEqual(labels.toSorted(), expected.toSorted());
   assert.equal((html.match(/<svg\b/g) || []).length, expected.length);
   assert.doesNotMatch(html, /<(?:img|image|use|script|iframe)\b[^>]*(?:src|href)=/i);
+});
+
+const extraFooterNetworks = [['nostr', 'Nostr'], ['amboss', 'Amboss'], ['mempool', 'Mempool.space']];
+
+for (const [key, label] of extraFooterNetworks) {
+  test(`footer exposes the optional ${label} URL setting and renders its inline icon`, () => {
+    const config = JSON.parse(fs.readFileSync(path.join(themeRoot, 'package.json'), 'utf8')).config.custom;
+    assert.equal(config[`${key}_url`]?.type, 'text');
+    const url = `https://example.com/${key}?first=1&second=2`;
+    const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, {}, null, {[`${key}_url`]: url});
+    const link = Array.from(html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g), match => match[0]).find(anchor => anchor.includes(`aria-label="${label}"`));
+    assert.ok(link, `Missing ${label} footer link`);
+    assert.ok(link.includes(`href="${Handlebars.escapeExpression(url)}"`));
+    assert.ok(link.includes('class="social-link"'));
+    assert.ok(link.includes('target="_blank" rel="noopener"'));
+    assert.match(link, /<svg\b/);
+  });
+
+  test(`footer hides ${label} when its URL is empty`, () => {
+    const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, {}, null, {[`${key}_url`]: ''});
+    assert.ok(!html.includes(`aria-label="${label}"`));
+  });
+}
+
+test('all three new networks coexist with the existing footer links', () => {
+  const custom = Object.fromEntries(extraFooterNetworks.map(([key]) => [`${key}_url`, `https://example.com/${key}`]));
+  const html = renderFooterLinks(custom).html;
+  const originalCount = (renderFooterLinks().html.match(/<svg\b/g) || []).length;
+  assert.equal((html.match(/<svg\b/g) || []).length, originalCount + extraFooterNetworks.length);
+  for (const [, label] of extraFooterNetworks) assert.ok(html.includes(`aria-label="${label}"`));
+  assert.ok(!html.includes('aria-label="Stacker News"'));
+});
+
+test('new footer icons inherit link colors without external assets or colored gradients', () => {
+  for (const [key] of extraFooterNetworks) {
+    const svg = fs.readFileSync(path.join(themeRoot, `partials/icons/icon-${key}.hbs`), 'utf8');
+    assert.match(svg, /<svg\b[^>]*fill="currentColor"/);
+    assert.doesNotMatch(svg, /(?:fill|stroke|stop-color)="(?:#|rgb)|<linearGradient\b|<style\b|<script\b|<image\b|<use\b|(?:href|src)\s*=/i);
+  }
+  const config = JSON.parse(fs.readFileSync(path.join(themeRoot, 'package.json'), 'utf8')).config.custom;
+  assert.equal(config.stacker_news_url, undefined, 'Stacker News is an artwork reference, not a requested footer link');
 });
 
 for (const network of networks) {

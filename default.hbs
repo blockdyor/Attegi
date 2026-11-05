@@ -555,6 +555,15 @@ own cover-active case is already covered there, so this attribute only needs the
 							{{#if @custom.github_url}}<a class="social-link" aria-label="{{t "GitHub"}}" href="{{@custom.github_url}}" title="{{t "GitHub"}}" target="_blank" rel="noopener">
 								<i class="icon icon-github" aria-hidden="true">{{> "icons/icon-github"}}</i>
 							</a>{{/if}}
+							{{#if @custom.nostr_url}}<a class="social-link" aria-label="{{t "Nostr"}}" href="{{@custom.nostr_url}}" title="{{t "Nostr"}}" target="_blank" rel="noopener">
+								<i class="icon icon-nostr" aria-hidden="true">{{> "icons/icon-nostr"}}</i>
+							</a>{{/if}}
+							{{#if @custom.amboss_url}}<a class="social-link" aria-label="{{t "Amboss"}}" href="{{@custom.amboss_url}}" title="{{t "Amboss"}}" target="_blank" rel="noopener">
+								<i class="icon icon-amboss" aria-hidden="true">{{> "icons/icon-amboss"}}</i>
+							</a>{{/if}}
+							{{#if @custom.mempool_url}}<a class="social-link" aria-label="{{t "Mempool.space"}}" href="{{@custom.mempool_url}}" title="{{t "Mempool.space"}}" target="_blank" rel="noopener">
+								<i class="icon icon-mempool" aria-hidden="true">{{> "icons/icon-mempool"}}</i>
+							</a>{{/if}}
 							{{#if @custom.telegram_url}}<a class="social-link" aria-label="{{t "Telegram"}}" href="{{@custom.telegram_url}}" title="{{t "Telegram"}}" target="_blank" rel="noopener">
 								<i class="icon icon-telegram" aria-hidden="true">{{> "icons/icon-telegram"}}</i>
 							</a>{{/if}}
