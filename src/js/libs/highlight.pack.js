@@ -4,7 +4,7 @@
   License: BSD-3-Clause
   Attegi local maintenance: statement-form mode transforms, explicit UTF-16
   string sorting, and removal of an unused WASM regex data-property read.
-  Based on upstream 11.12.0; not byte-identical. Grammars/regexes unchanged.
+  Based on upstream 11.12.0; not byte-identical. Recursive JS parameter scan repaired.
  */
 var hljs=function(){"use strict";function e(n){
 return n instanceof Map?n.clear=n.delete=n.set=()=>{

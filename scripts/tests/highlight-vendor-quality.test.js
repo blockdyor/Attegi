@@ -18,9 +18,10 @@ for (const { start, end, source: original } of fixture.originalFunctions) {
 }
 baseline = baseline.replaceAll('.sort((a,b)=>a<b?-1:a>b?1:0).reverse()', '.sort().reverse()')
     .replace('grmr_wasm:e=>{const', 'grmr_wasm:e=>{e.regex;const')
+    .replace('h=_.concat([{begin:/\\(/', 'h=_.concat([{begin:/(\\s*)\\(/')
     .replace('  Attegi local maintenance: statement-form mode transforms, explicit UTF-16\n' +
         '  string sorting, and removal of an unused WASM regex data-property read.\n' +
-        '  Based on upstream 11.12.0; not byte-identical. Grammars/regexes unchanged.\n', '');
+        '  Based on upstream 11.12.0; not byte-identical. Recursive JS parameter scan repaired.\n', '');
 assert.equal(createHash('sha256').update(baseline).digest('hex'), fixture.sha256,
     'Inverse excerpts must reconstruct the exact pre-maintenance bundle');
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -131,6 +132,20 @@ test('differential CSS-family output for every fixed media feature, pseudo and a
         'a {' + attributes.map(name => `${name}: initial;`).join('\n') + '}';
     for (const language of ['css', 'less', 'scss']) {
         expect(result(after.api, code, language, true)).toEqual(result(before.api, code, language, true));
+    }
+});
+
+test('automatic detection preserves the original language ranking, HTML and relevance', () => {
+    for (const code of [
+        samples.javascript,
+        samples.typescript,
+        'function f \t\n (a = (1 + (2)), b = call(3)) { return a; }',
+        'function f(a = (        !)) {}'
+    ]) {
+        const summarize = value => plain({value: value.value, relevance: value.relevance,
+            language: value.language, illegal: value.illegal,
+            secondBest: value.secondBest && {language: value.secondBest.language, relevance: value.secondBest.relevance}});
+        expect(summarize(after.api.highlightAuto(code))).toEqual(summarize(before.api.highlightAuto(code)));
     }
 });
 

@@ -3,8 +3,10 @@
 `highlight.pack.js` is locally maintained from the existing highlight.js 11.12.0
 bundle (upstream git identifier `f7f7d3803b`). Its BSD-3-Clause notice remains in
 place. This is not a byte-identical upstream distribution. No version bump,
-language removal, regex change, dependency, suppression, or build exclusion is
-part of this maintenance.
+language removal, dependency, suppression, or build exclusion is
+part of this maintenance. The recursive JavaScript parameter mode additionally
+uses `/\(/` instead of `/(\s*)\(/`; outer parameter-entry modes retain their
+whitespace prefixes because removing them changes valid multiline highlighting.
 
 ## Finding-to-change map
 
@@ -20,6 +22,7 @@ All issue IDs share prefix `AaGqubYQiPLUZgo8aW`.
 | 2H | S905 | 96:29–99:36 | Split `beforeMatch` conversion into statements; delete the copied object's `beforeMatch` only after installing it in `starts.contains`. |
 | 2I | S905 | 112:0–113:15 | Retain truthy/object/non-null scope guards; assign `beginScope` then delete scope. |
 | 3A | S905 | 1194:31–1194:39 | Remove discarded WASM `e.regex` read. The actual bundled API assigns `regex` as a data property before registering languages; no getter runs. This is not a claim about externally supplied getter-bearing objects. |
+| 2J | S8786 | 343:54–343:63 | Remove only the recursive parameter-mode whitespace prefix; JavaScript and TypeScript share this mode. Outer-entry prefixes remain unchanged. |
 | 2Q | S2871 | 400:1518–400:1522 | Explicit UTF-16 comparator on 33 media-feature strings. |
 | 2R | S2871 | 400:2188–400:2192 | Same on 59 pseudo-class strings. |
 | 2S | S2871 | 400:2370–400:2374 | Same on 14 pseudo-element strings. |
@@ -59,5 +62,7 @@ The source-form and explicit-comparator diagnostics fail on the original bundle;
 behavioral comparisons already pass there, as expected for style-only repairs.
 Build verification is explicitly skipped unless `HIGHLIGHT_VERIFY_BUILD=1`.
 GScan compatibility is not Sonar analysis. These tests are bounded regression
-coverage, not exhaustive input/browser proof or regex safety evidence. The 56
-S8786 findings are unchanged; a fresh Sonar analysis remains required.
+coverage, not exhaustive input/browser proof or regex safety evidence. The recursive JS parameter occurrence is repaired locally; other original
+S8786 findings still require triage/fixes and a fresh Sonar analysis is required
+to establish actual issue status. The exact prepatch oracle is retained by
+inverting this single grammar edit as well as the statement/sort changes.
