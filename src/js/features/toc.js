@@ -373,8 +373,8 @@ function updateProgressRing() {
 function setTriggerDefaultBottom() {
   if (triggerDefaultBottom !== null || !elements.mobileTrigger) return;
   var style = window.getComputedStyle(elements.mobileTrigger);
-  var value = parseFloat(style.bottom);
-  triggerDefaultBottom = isNaN(value) ? 32 : value;
+  var value = Number.parseFloat(style.bottom);
+  triggerDefaultBottom = Number.isNaN(value) ? 32 : value;
 }
 
 function getTriggerDefaultBottom() {

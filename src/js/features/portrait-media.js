@@ -8,7 +8,7 @@ import { qsa } from '../core/index.js';
 function getNumericAttribute(node, name) {
   var value = node.getAttribute(name);
   if (!value) return null;
-  var parsed = parseFloat(value);
+  var parsed = Number.parseFloat(value);
   return parsed > 0 ? parsed : null;
 }
 
