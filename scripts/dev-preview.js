@@ -272,8 +272,19 @@ function confinedPath(root, filePath) {
 }
 
 async function serveRemoteAsset(pathname, response) {
-  const remoteUrl = new URL(pathname.replace(/^\/+/, ''), withTrailingSlash(api.siteUrl));
-  const remoteResponse = await fetch(remoteUrl);
+  const siteOrigin = new URL(api.siteUrl).origin;
+  let remoteUrl = new URL(pathname.replace(/^\/+/, ''), withTrailingSlash(api.siteUrl));
+  let remoteResponse;
+  for (let redirects = 0; redirects <= 20; redirects++) {
+    // Absolute paths and redirect destinations must stay on the configured Ghost origin.
+    if (remoteUrl.origin !== siteOrigin) throw forbiddenPath();
+    remoteResponse = await fetch(remoteUrl, { redirect: 'manual' });
+    const location = remoteResponse.headers.get('location');
+    if (![301, 302, 303, 307, 308].includes(remoteResponse.status) || !location) break;
+    await remoteResponse.body?.cancel();
+    if (redirects === 20) throw new Error('Too many asset redirects');
+    remoteUrl = new URL(location, remoteUrl);
+  }
 
   if (!remoteResponse.ok) {
     response.writeHead(remoteResponse.status || 404, { 'Cache-Control': 'no-store' });
