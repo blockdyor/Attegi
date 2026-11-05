@@ -1,0 +1,31 @@
+{
+  "commit": "7c8c19e96567b98e0a7ac99d896b2f1c8185e332",
+  "sha256": "8ab71eb09c51f501e5e25157d9cff100e46cc29bcbfc744d0b746d451fca7f53",
+  "originalFunctions": [
+    {
+      "start": "function R(e,n){",
+      "end": "function D(e,n){",
+      "source": "function R(e,n){\nvoid 0!==e.className&&(e.scope=e.className,delete e.className)}"
+    },
+    {
+      "start": "function D(e,n){",
+      "end": "function I(e,n){",
+      "source": "function D(e,n){\nn&&e.beginKeywords&&(e.begin=\"\\\\b(\"+e.beginKeywords.split(\" \").join(\"|\")+\")(?!\\\\.)(?=\\\\b|\\\\s)\",\ne.__beforeBegin=T,e.keywords=e.keywords||e.beginKeywords,delete e.beginKeywords,\nvoid 0===e.relevance&&(e.relevance=0))}"
+    },
+    {
+      "start": "function L(e,n){",
+      "end": "function B(e,n){",
+      "source": "function L(e,n){\nif(e.match){\nif(e.begin||e.end)throw Error(\"begin & end are not supported with match\")\n;e.begin=e.match,delete e.match}}"
+    },
+    {
+      "start": "const F=(e,n)=>{",
+      "end": ",$=[",
+      "source": "const F=(e,n)=>{if(!e.beforeMatch)return\n;if(e.starts)throw Error(\"beforeMatch cannot be used with starts\")\n;const t=Object.assign({},e);Object.keys(e).forEach(n=>{delete e[n]\n}),e.keywords=t.keywords,e.begin=b(t.beforeMatch,d(t.begin)),e.starts={\nrelevance:0,contains:[Object.assign(t,{endsParent:!0})]\n},e.relevance=0,delete t.beforeMatch\n}"
+    },
+    {
+      "start": "function Z(e){",
+      "end": "function W(e){",
+      "source": "function Z(e){(e=>{\ne.scope&&\"object\"==typeof e.scope&&null!==e.scope&&(e.beginScope=e.scope,\ndelete e.scope)})(e),\"string\"==typeof e.beginScope&&(e.beginScope={\n_wrap:e.beginScope}),\"string\"==typeof e.endScope&&(e.endScope={_wrap:e.endScope\n}),(e=>{if(Array.isArray(e.begin)){\nif(e.skip||e.excludeBegin||e.returnBegin)throw P(\"skip, excludeBegin, returnBegin not compatible with beginScope: {}\"),\nq\n;if(\"object\"!=typeof e.beginScope||null===e.beginScope)throw P(\"beginScope must be object\"),\nq;G(e,e.begin,{key:\"beginScope\"}),e.begin=h(e.begin,{joinWith:\"\"})}})(e),(e=>{\nif(Array.isArray(e.end)){\nif(e.skip||e.excludeEnd||e.returnEnd)throw P(\"skip, excludeEnd, returnEnd not compatible with endScope: {}\"),\nq\n;if(\"object\"!=typeof e.endScope||null===e.endScope)throw P(\"endScope must be object\"),\nq;G(e,e.end,{key:\"endScope\"}),e.end=h(e.end,{joinWith:\"\"})}})(e)}"
+    }
+  ]
+}
