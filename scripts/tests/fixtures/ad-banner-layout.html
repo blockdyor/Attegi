@@ -36,12 +36,12 @@
     for (const id of ['ordinary', 'figure-image']) {
       const style = getComputedStyle(document.getElementById(id));
       const box = rect(id);
-      const expectedMargin = id === 'ordinary' ? 1.5 * parseFloat(style.fontSize) : 0;
-      assert(Math.abs(parseFloat(style.marginTop) - expectedMargin) < 0.1, `${id} top spacing changed`);
-      assert(Math.abs(parseFloat(style.marginBottom) - expectedMargin) < 0.1, `${id} bottom spacing changed`);
+      const expectedMargin = id === 'ordinary' ? 1.5 * Number.parseFloat(style.fontSize) : 0;
+      assert(Math.abs(Number.parseFloat(style.marginTop) - expectedMargin) < 0.1, `${id} top spacing changed`);
+      assert(Math.abs(Number.parseFloat(style.marginBottom) - expectedMargin) < 0.1, `${id} bottom spacing changed`);
       if (id === 'figure-image') {
         const cardStyle = getComputedStyle(document.getElementById(id).parentElement);
-        assert(Math.abs(parseFloat(cardStyle.marginTop) - 1.5 * parseFloat(cardStyle.fontSize)) < 0.1, 'Figure card spacing changed');
+        assert(Math.abs(Number.parseFloat(cardStyle.marginTop) - 1.5 * Number.parseFloat(cardStyle.fontSize)) < 0.1, 'Figure card spacing changed');
       }
       assert(box.width <= document.querySelector('main').clientWidth && Math.abs(box.width / box.height - 2) < 0.01, `${id} responsive sizing changed`);
     }
