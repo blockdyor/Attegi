@@ -2,6 +2,10 @@
 
 This theme bundles the following third-party libraries. Their license texts are included below.
 
+## Creative Commons license icon
+
+`assets/img/cc-by-sa.svg` is the CC BY-SA icon used by blockdyor.com, bundled unchanged from https://cdn.nakamotoinstitute.org/img/cc-by-sa.svg rather than hotlinked. It identifies the site's Creative Commons Attribution-ShareAlike 4.0 International content license (https://creativecommons.org/licenses/by-sa/4.0/). The theme's source code remains under its existing AGPL-3.0-only license.
+
 ## tocbot (MIT License)
 Source: https://github.com/tscanlin/tocbot
 

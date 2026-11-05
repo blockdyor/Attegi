@@ -66,6 +66,19 @@ test('no accounts render no social links, including site accounts on an author w
   assert.doesNotThrow(() => renderTemplate(hbs, 'default.hbs', {body: 'Home'}));
 });
 
+test('footer renders the blockdyor CC BY-SA notice with a bundled icon', () => {
+  const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, {title: 'blockdyor'});
+  const footer = html.match(/<footer\b[\s\S]*?<\/footer>/)[0];
+  assert.match(footer, /blockdyor is licensed under a/);
+  assert.match(footer, /rel="license noopener nofollow"[^>]*href="https:\/\/creativecommons.org\/licenses\/by-sa\/4\.0\/"/);
+  assert.match(footer, /Creative Commons Attribution-ShareAlike 4\.0 International License/);
+  assert.match(footer, /class="footer-license-icon" src="\/assets\/img\/cc-by-sa\.svg" alt="" aria-hidden="true" width="42" height="13"/);
+  assert.doesNotMatch(footer, /<img[^>]+src="(?:https?:)?\/\//);
+  const icon = fs.readFileSync(path.join(themeRoot, 'assets/img/cc-by-sa.svg'), 'utf8');
+  assert.match(icon, /<svg\b/);
+  assert.doesNotMatch(icon, /<script\b|<image\b|<foreignObject\b|(?:href|src)\s*=/i);
+});
+
 test('partial escapes its caller-provided class', () => {
   const hbs = renderer();
   const html = hbs.compile('{{> "social-links" source=source social_link_class=cssClass}}')({
