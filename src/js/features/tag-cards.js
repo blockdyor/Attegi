@@ -91,7 +91,15 @@ function sampleDominantColor(card, srcImg) {
 function applyDominantColors() {
   each(qsa('.tag-card.has-image'), function(card) {
     var img = card.querySelector('.tag-card-bg > img');
-    if (img) sampleDominantColor(card, img);
+    if (!img) return;
+    // A detached probe must not bypass the visible image's lazy loading.
+    if (img.complete && img.naturalWidth) {
+      sampleDominantColor(card, img);
+    } else {
+      img.addEventListener('load', function() {
+        sampleDominantColor(card, img);
+      }, { once: true });
+    }
   });
 }
 

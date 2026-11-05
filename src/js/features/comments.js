@@ -89,8 +89,12 @@ export function setupLazyComments() {
     });
   }
 
-  function loadComments() {
+  function loadComments(event) {
     if (hasLoaded) return;
+    var userActivated = event && event.type === 'click';
+    // Let a reader focused on the trigger decide when to open comments.
+    if (!userActivated && doc.activeElement === trigger) return;
+    var restoreFocus = userActivated && doc.activeElement === trigger;
     hasLoaded = true;
     trigger.setAttribute('aria-busy', 'true');
     trigger.classList.add('is-loading');
@@ -119,15 +123,17 @@ export function setupLazyComments() {
         placeholder.appendChild(content);
         activateScripts(placeholder, storedScripts);
 
+        var moveFocus = restoreFocus && doc.activeElement === trigger;
         trigger.classList.add('is-loaded');
         trigger.setAttribute('aria-expanded', 'true');
         trigger.setAttribute('hidden', 'true');
         trigger.removeAttribute('aria-busy');
 
-        // The trigger is now hidden and unfocusable; move focus into the
-        // loaded comments instead of dropping it back to <body>.
-        placeholder.setAttribute('tabindex', '-1');
-        placeholder.focus();
+        // Automatic loading and readers who already moved on keep their focus.
+        if (moveFocus) {
+          placeholder.setAttribute('tabindex', '-1');
+          placeholder.focus();
+        }
       } catch (err) {
         hasLoaded = false;
         trigger.classList.remove('is-loading');
