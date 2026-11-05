@@ -146,9 +146,9 @@ own cover-active case is already covered there, so this attribute only needs the
 
 				var accentStyle = document.createElement('style');
 				accentStyle.textContent =
-					':root { --color-on-accent: ' + onAccentFor(lightAccent) + '; --color-accent-text: ' + lightAccentText + '; }' +
-					'.theme-dark:root { --color-on-accent: ' + onAccentFor(darkAccent) + '; --ghost-accent-color: ' + darkAccent + '; --color-accent-text: ' + darkAccentText + '; }' +
-					'@media (prefers-color-scheme: dark) { html:not(.theme-light):root { --color-on-accent: ' + onAccentFor(darkAccent) + '; --ghost-accent-color: ' + darkAccent + '; --color-accent-text: ' + darkAccentText + '; } }';
+					':root { --attegi-on-accent: ' + onAccentFor(lightAccent) + '; --attegi-accent-text: ' + lightAccentText + '; }' +
+					'.theme-dark:root { --attegi-on-accent: ' + onAccentFor(darkAccent) + '; --ghost-accent-color: ' + darkAccent + '; --attegi-accent-text: ' + darkAccentText + '; }' +
+					'@media (prefers-color-scheme: dark) { html:not(.theme-light):root { --attegi-on-accent: ' + onAccentFor(darkAccent) + '; --ghost-accent-color: ' + darkAccent + '; --attegi-accent-text: ' + darkAccentText + '; } }';
 				document.head.appendChild(accentStyle);
 
 				// Hide the toggle when @custom.color_scheme forces a theme.
@@ -580,6 +580,20 @@ own cover-active case is already covered there, so this attribute only needs the
 					<span class="footer-license-text">{{@site.title}} is licensed under a <a class="footer-license-link" rel="license noopener nofollow" target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>&nbsp;<img class="footer-license-icon" src="{{asset "img/cc-by-sa.svg"}}" alt="" aria-hidden="true" width="42" height="13" loading="lazy" /></span>
 				</div>
 			</footer>
+
+			{{#if @site.members_enabled}}
+				{{#if @site.portal_button}}
+					{{#if @member}}
+						<a class="floating-subscribe nav-button-primary" href="#/portal/account" data-portal="account">{{t "Account"}}</a>
+					{{else}}
+						{{#if @site.members_invite_only}}
+							<a class="floating-subscribe nav-button-primary" href="#/portal/signin" data-portal="signin">{{t "Sign in"}}</a>
+						{{else}}
+							<a class="floating-subscribe nav-button-primary" href="#/portal/signup" data-portal="signup">{{t "Subscribe"}}</a>
+						{{/if}}
+					{{/if}}
+				{{/if}}
+			{{/if}}
 
 		</section>
 	</div>

@@ -22,6 +22,7 @@ const excludePatterns = [
   '.git/**',
   '.github/**',
   'scripts/**',
+  'docs/**',
   '.gitignore',
   '.gitattributes',
   'Gruntfile.js',
