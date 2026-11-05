@@ -19,10 +19,10 @@ Preserve current design, Ghost signup/account behavior, ad snippets and content.
 
 ## Task 1: Theme-native floating launcher
 Files: default.hbs, src/sass/style.scss, scripts/tests/social-links.test.js.
-- [ ] Add failing render tests for membership states and Portal link targets.
-- [ ] Add one server-rendered floating link reusing nav-button-primary and translated labels.
-- [ ] Scope CSS replacement to an initialized native launcher, reuse glass/motion tokens, guard modal/menu state and reading-control collisions.
-- [ ] Verify actual browser rendering/Portal opening at mobile/desktop, both color schemes, disabled launcher and reduced motion.
+- [x] Add failing render tests for membership states and Portal link targets.
+- [x] Add one server-rendered floating link reusing nav-button-primary and translated labels.
+- [x] Scope CSS replacement to Portal initialization and the site button setting, reuse glass/motion tokens, guard modal/menu state and reading-control collisions.
+- [x] Verify actual browser rendering/Portal opening at mobile/desktop, both color schemes, disabled launcher and reduced motion.
 
 ## Task 2: Shared advertising layout
 Files: content-image SCSS section and focused regression fixture/test returned by the isolated ad-layout worker.
