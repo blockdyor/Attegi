@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Build CSS, then run checkReadiness() at mobile/desktop widths. -->
+<html lang="en" class="theme-light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal launcher readiness regression</title>
+<link rel="stylesheet" href="../../../assets/css/style.css">
+<body>
+<a class="floating-subscribe nav-button-primary" href="#/portal/signup" data-portal="signup">Subscribe</a>
+<div id="ghost-portal-root"></div>
+<script>
+window.checkReadiness = () => {
+  const root = document.getElementById('ghost-portal-root');
+  const link = document.querySelector('.floating-subscribe');
+  const failures = [];
+  const assert = (condition, message) => {if (!condition) failures.push(message);};
+  root.replaceChildren();
+  link.classList.add('gh-portal-close'); // Native binding alone precedes API success.
+  assert(getComputedStyle(link).display === 'none', 'Empty/loading/failed root exposes launcher');
+  const frame = document.createElement('iframe');
+  frame.title = 'portal-trigger';
+  frame.className = 'gh-portal-triggerbtn-iframe';
+  root.appendChild(frame);
+  const desktop = innerWidth >= 640;
+  assert((getComputedStyle(link).display !== 'none') === desktop, 'Wrong viewport visibility');
+  assert((getComputedStyle(frame).display === 'none') === desktop, 'Native suppression uses a different readiness gate');
+  link.remove();
+  assert(getComputedStyle(frame).display !== 'none', 'Native fallback hidden without replacement');
+  document.body.prepend(link);
+  root.replaceChildren();
+  assert(getComputedStyle(link).display === 'none', 'Launcher remains after native readiness is lost');
+  return {passed: failures.length === 0, failures, width: innerWidth};
+};
+</script>
+</body>
+</html>

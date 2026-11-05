@@ -2971,12 +2971,18 @@ textarea {
 	}
 }
 
-body:has(#ghost-portal-root) .floating-subscribe {
-	display: inline-flex;
-}
+// The native iframe is rendered only after successful Portal initialization.
+// Keep Ghost's desktop-only behavior; an empty root is not a readiness signal.
+@media only screen and (min-width: $breakpoint-medium) {
+	body:has(#ghost-portal-root .gh-portal-triggerbtn-iframe) {
+		.floating-subscribe {
+			display: inline-flex;
+		}
 
-body:has(.floating-subscribe) .gh-portal-triggerbtn-iframe {
-	display: none;
+		&:has(.floating-subscribe) .gh-portal-triggerbtn-iframe {
+			display: none;
+		}
+	}
 }
 
 // Leave the existing reading controls in their usual bottom-right position.
