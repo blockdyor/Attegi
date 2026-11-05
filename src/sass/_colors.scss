@@ -13,14 +13,15 @@
   // Ghost admins can pick any accent, so the real value is computed at
   // runtime from the accent's luminance (see default.hbs); these are the
   // pre-JS/no-JS fallbacks for the shipped default accent colors.
-  --color-on-accent: #fff;
+  // Keep computed values separate so this later stylesheet cannot reset them.
+  --color-on-accent: var(--attegi-on-accent, #fff);
 
   // Accent color for TEXT (links, etc.), as opposed to accent-colored fills.
   // Ghost admins can pick a light or low-contrast accent that reads fine as
   // a small fill but fails as text on the page background; default.hbs
   // checks that at runtime and overrides this with a darkened/lightened
   // variant when needed. Static fallback: same as the fill color.
-  --color-accent-text: var(--ghost-accent-color);
+  --color-accent-text: var(--attegi-accent-text, var(--ghost-accent-color));
 
   /* Hairlines: card outlines, table rules, dividers */
   --color-border: rgb(0 0 0 / 0.08);
@@ -70,7 +71,7 @@
     --color-content-main: #E2E6EB;
     --color-content-secondary: #B6BBC4;
 
-    --color-on-accent: #1D1F21;
+    --color-on-accent: var(--attegi-on-accent, #1D1F21);
 
     --color-border: rgb(255 255 255 / 0.09);
     --color-border-strong: rgb(255 255 255 / 0.18);

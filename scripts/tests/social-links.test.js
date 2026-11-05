@@ -37,10 +37,10 @@ function renderer() {
   return hbs;
 }
 
-function renderTemplate(hbs, name, context, site = {}) {
+function renderTemplate(hbs, name, context, site = {}, member = null) {
   hbs.templates[name] ||= hbs.compile(fs.readFileSync(path.join(themeRoot, name), 'utf8'));
   return hbs.templates[name](context, {
-    data: {site, custom: {color_scheme: 'System'}}
+    data: {site, member, custom: {color_scheme: 'System'}}
   });
 }
 
@@ -79,6 +79,31 @@ test('footer renders the blockdyor CC BY-SA notice with a bundled icon', () => {
   const icon = fs.readFileSync(path.join(themeRoot, 'assets/img/cc-by-sa.svg'), 'utf8');
   assert.match(icon, /<svg\b/);
   assert.doesNotMatch(icon, /<script\b|<image\b|<foreignObject\b|(?:href|src)\s*=/i);
+});
+
+for (const [label, site, member, page, text] of [
+  ['public signup', {members_enabled: true, portal_button: true}, null, 'signup', 'Subscribe'],
+  ['invite-only signin', {members_enabled: true, portal_button: true, members_invite_only: true}, null, 'signin', 'Sign in'],
+  ['member account', {members_enabled: true, portal_button: true}, {name: 'Member'}, 'account', 'Account']
+]) {
+  test(`floating glass launcher renders ${label} using native Portal`, () => {
+    const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, site, member);
+    const launcher = html.match(/<a class="floating-subscribe nav-button-primary"[\s\S]*?<\/a>/)?.[0];
+    assert.ok(launcher, 'Missing floating launcher');
+    assert.ok(launcher.includes(`href="#/portal/${page}"`));
+    assert.ok(launcher.includes(`data-portal="${page}"`));
+    assert.ok(launcher.includes(`>${text}</a>`));
+  });
+}
+
+test('floating launcher is absent when Ghost membership is disabled', () => {
+  const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, {members_enabled: false, portal_button: true});
+  assert.doesNotMatch(html, /class="floating-subscribe/);
+});
+
+test('floating launcher respects the Ghost Portal button visibility setting', () => {
+  const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, {members_enabled: true, portal_button: false});
+  assert.doesNotMatch(html, /class="floating-subscribe/);
 });
 
 test('partial escapes its caller-provided class', () => {
