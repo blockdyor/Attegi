@@ -13,7 +13,12 @@ const { URL } = require('url');
 const Handlebars = require('handlebars');
 const browserSync = require('browser-sync').create();
 
-const ROOT = process.cwd();
+const ROOT = fs.realpathSync(process.cwd());
+const TEMPLATE_FILES = Object.freeze({
+  default: 'default.hbs', index: 'index.hbs', post: 'post.hbs', page: 'page.hbs',
+  tag: 'tag.hbs', author: 'author.hbs', error: 'error.hbs',
+  'error-404': 'error-404.hbs', 'page-tags': 'page-tags.hbs', 'page-links': 'page-links.hbs'
+});
 const DEFAULT_PREVIEW_PORT = 3020;
 const DEFAULT_RENDER_PORT = 3021;
 const DEFAULT_POSTS_PER_PAGE = 8;
@@ -60,6 +65,11 @@ registerHelpers();
 
 const renderServer = http.createServer((request, response) => {
   handleRequest(request, response).catch((error) => {
+    if (error.statusCode === 400 || error.statusCode === 403) {
+      response.writeHead(error.statusCode);
+      response.end(error.statusCode === 400 ? 'Bad request' : 'Forbidden');
+      return;
+    }
     console.error('[preview] Render failed:', error);
     sendHtml(response, 500, renderErrorPage(error));
   });
@@ -70,6 +80,8 @@ renderServer.listen(renderPort, '127.0.0.1', () => {
     {
       proxy: `http://127.0.0.1:${renderPort}`,
       port: previewPort,
+      listen: '127.0.0.1',
+      online: false,
       open: autoOpen,
       notify: false,
       ghostMode: false,
@@ -182,11 +194,23 @@ function createGhostApi(siteUrl, key) {
 }
 
 async function handleRequest(request, response) {
+  // Validate before URL parsing discards dot segments, and before decoding asset names.
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(request.url.split('?')[0]);
+  } catch {
+    throw Object.assign(new Error('Bad request'), { statusCode: 400 });
+  }
+  if (decodedPath.includes('\\') || decodedPath.includes('\0') ||
+      decodedPath.split('/').some((segment) => segment === '..' || segment === '.') ||
+      /%(?:2e|2f|5c|00)/i.test(decodedPath)) {
+    throw forbiddenPath();
+  }
   const requestUrl = new URL(request.url, `http://localhost:${previewPort}`);
   const pathname = normalizePathname(requestUrl.pathname);
 
-  if (pathname.startsWith('/assets/')) {
-    serveAsset(pathname, response);
+  if (pathname === '/assets' || pathname.startsWith('/assets/')) {
+    serveAsset(decodeURIComponent(pathname), response);
     return;
   }
 
@@ -209,16 +233,14 @@ function hasRequestExtension(pathname) {
 }
 
 function serveAsset(pathname, response) {
-  const assetPath = path.normalize(path.join(ROOT, pathname));
-  if (!assetPath.startsWith(path.join(ROOT, 'assets'))) {
-    response.writeHead(403);
-    response.end('Forbidden');
-    return;
-  }
-
-  if (!fs.existsSync(assetPath) || !fs.statSync(assetPath).isFile()) {
-    response.writeHead(404);
-    response.end('Not found');
+  let assetPath;
+  try {
+    assetPath = confinedPath(path.join(ROOT, 'assets'), path.join(ROOT, pathname));
+    if (!fs.statSync(assetPath).isFile()) throw Object.assign(new Error('Not found'), { code: 'ENOENT' });
+  } catch (error) {
+    if (error.statusCode !== 403 && error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+    response.writeHead(error.statusCode || 404);
+    response.end(error.statusCode === 403 ? 'Forbidden' : 'Not found');
     return;
   }
 
@@ -227,7 +249,20 @@ function serveAsset(pathname, response) {
     'Content-Type': ASSET_TYPES[ext] || 'application/octet-stream',
     'Cache-Control': 'no-store'
   });
-  fs.createReadStream(assetPath).pipe(response);
+  fs.createReadStream(assetPath).on('error', () => response.destroy()).pipe(response);
+}
+
+function forbiddenPath() {
+  return Object.assign(new Error('Forbidden'), { statusCode: 403 });
+}
+
+function confinedPath(root, filePath) {
+  const relative = path.relative(root, filePath);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw forbiddenPath();
+  const realPath = fs.realpathSync(filePath);
+  const realRelative = path.relative(root, realPath);
+  if (realRelative === '..' || realRelative.startsWith(`..${path.sep}`) || path.isAbsolute(realRelative)) throw forbiddenPath();
+  return realPath;
 }
 
 async function serveRemoteAsset(pathname, response) {
@@ -577,17 +612,20 @@ function buildHandlebarsData(model, root) {
 }
 
 function compileTemplate(name) {
-  let source = fs.readFileSync(path.join(ROOT, `${name}.hbs`), 'utf8');
+  if (!Object.hasOwn(TEMPLATE_FILES, name)) throw forbiddenPath();
+  const filePath = confinedPath(ROOT, path.join(ROOT, TEMPLATE_FILES[name]));
+  let source = fs.readFileSync(filePath, 'utf8');
   source = source.replace(/^\s*\{\{!<\s+default\s*\}\}\s*/, '');
   return Handlebars.compile(source, { noEscape: false });
 }
 
 function registerPartials() {
   const partialRoot = path.join(ROOT, 'partials');
+  confinedPath(partialRoot, partialRoot);
   const files = walk(partialRoot).filter((file) => file.endsWith('.hbs'));
   files.forEach((file) => {
     const name = path.relative(partialRoot, file).replace(/\.hbs$/, '').split(path.sep).join('/');
-    Handlebars.registerPartial(name, Handlebars.compile(fs.readFileSync(file, 'utf8')));
+    Handlebars.registerPartial(name, Handlebars.compile(fs.readFileSync(confinedPath(partialRoot, file), 'utf8')));
   });
 }
 
@@ -653,6 +691,7 @@ function getLocaleMessages(locale) {
   candidates.push('en');
 
   for (const candidate of candidates) {
+    if (!/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(candidate)) continue;
     if (localeCache.has(candidate)) {
       return localeCache.get(candidate);
     }
@@ -660,7 +699,7 @@ function getLocaleMessages(locale) {
     const filePath = path.join(ROOT, 'locales', `${candidate}.json`);
     if (!fs.existsSync(filePath)) continue;
 
-    const messages = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const messages = JSON.parse(fs.readFileSync(confinedPath(path.join(ROOT, 'locales'), filePath), 'utf8'));
     localeCache.set(candidate, messages);
     return messages;
   }
