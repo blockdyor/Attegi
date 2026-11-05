@@ -2945,55 +2945,9 @@ textarea {
 	}
 }
 
-// Keep Ghost's signup/account handling and launcher visibility setting, but
-// replace its iframe button with a theme-native glass pill once Portal loads.
-.floating-subscribe {
-	display: none;
-	position: fixed;
-	right: max(2rem, env(safe-area-inset-right));
-	bottom: max(2rem, env(safe-area-inset-bottom));
-	z-index: var(--z-floating-ui);
-	min-height: 4.4rem;
-	max-width: calc(100vw - 4rem);
-
-	&:focus-visible {
-		outline: 2px solid var(--color-content-main);
-		outline-offset: 4px;
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		transition: none;
-
-		&:hover,
-		&:active {
-			transform: none;
-		}
-	}
-}
-
-// The native iframe is rendered only after successful Portal initialization.
-// Keep Ghost's desktop-only behavior; an empty root is not a readiness signal.
-@media only screen and (min-width: $breakpoint-medium) {
-	body:has(#ghost-portal-root .gh-portal-triggerbtn-iframe) {
-		.floating-subscribe {
-			display: inline-flex;
-		}
-
-		&:has(.floating-subscribe) .gh-portal-triggerbtn-iframe {
-			display: none;
-		}
-	}
-}
-
-// Leave the existing reading controls in their usual bottom-right position.
-body:has(.back-to-top, .toc-mobile-trigger) .floating-subscribe {
-	bottom: calc(max(2rem, env(safe-area-inset-bottom)) + 8rem);
-}
-
-.menu-active .floating-subscribe,
-body:has(.toc-mobile-drawer.is-open) .floating-subscribe,
-.floating-subscribe.gh-portal-open {
-	visibility: hidden;
+// Match Portal's normal-scheme document so dark mode does not force an opaque iframe canvas.
+.gh-portal-triggerbtn-iframe {
+	color-scheme: normal;
 }
 
 // Flatter than the desktop pills: on the plain mobile header the drop

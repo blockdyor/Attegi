@@ -81,18 +81,17 @@ test('footer renders the blockdyor CC BY-SA notice with a bundled icon', () => {
   assert.doesNotMatch(icon, /<script\b|<image\b|<foreignObject\b|(?:href|src)\s*=/i);
 });
 
-for (const [label, site, member, page, text] of [
-  ['public signup', {members_enabled: true, portal_button: true}, null, 'signup', 'Subscribe'],
-  ['invite-only signin', {members_enabled: true, portal_button: true, members_invite_only: true}, null, 'signin', 'Sign in'],
-  ['member account', {members_enabled: true, portal_button: true}, {name: 'Member'}, 'account', 'Account']
+for (const [label, site, member] of [
+  ['public signup', {members_enabled: true, portal_button: true}, null],
+  ['invite-only signin', {members_enabled: true, portal_button: true, members_invite_only: true}, null],
+  ['member account', {members_enabled: true, portal_button: true}, {name: 'Member'}]
 ]) {
-  test(`floating glass launcher renders ${label} using native Portal`, () => {
-    const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, site, member);
-    const launcher = html.match(/<a class="floating-subscribe nav-button-primary"[\s\S]*?<\/a>/)?.[0];
-    assert.ok(launcher, 'Missing floating launcher');
-    assert.ok(launcher.includes(`href="#/portal/${page}"`));
-    assert.ok(launcher.includes(`data-portal="${page}"`));
-    assert.ok(launcher.includes(`>${text}</a>`));
+  test(`Ghost owns the editable floating launcher for ${label}`, () => {
+    const hbs = renderer();
+    hbs.registerHelper('ghost_head', () => new Handlebars.SafeString('<!-- native-portal-injection -->'));
+    const html = renderTemplate(hbs, 'default.hbs', {body: 'Home'}, site, member);
+    assert.ok(html.includes('<!-- native-portal-injection -->'), 'Ghost must retain its injection point');
+    assert.doesNotMatch(html, /class="floating-subscribe/, 'A theme clone bypasses Portal icon/text settings');
   });
 }
 

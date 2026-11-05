@@ -1,5 +1,7 @@
 # Measured Attegi modernization
 
+> Follow-up correction: retain Ghost's actual native launcher, not a theme-owned floating proxy. The proxy bypassed the Portal editor's custom text/icon/style settings. Remove the clone and native suppression; address iframe color-scheme compatibility without replacing its contents. The original v6.12.5 approach below is historical, not the current requirement.
+
 ## Approved intent
 Andrea approved measured modernization rather than a ground-up rewrite: fix the floating Subscribe widget and reusable ad layout first, then implement only evidence-backed performance, security and accessibility improvements. Preserve the current design, Ghost features, existing content and advertising snippets. No new framework or dependency without demonstrated need. Do not deploy to the live site automatically.
 
