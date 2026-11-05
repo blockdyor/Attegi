@@ -9,6 +9,7 @@ const networks = ['twitter', 'facebook', 'linkedin', 'bluesky', 'threads', 'mast
 
 function renderer() {
   const hbs = Handlebars.create();
+  hbs.templates = {};
   // Model Ghost's registered helper: bare {{link_class}} must not resolve
   // a partial parameter, even when the context contains that property.
   hbs.registerHelper('link_class', (options) => {
@@ -37,7 +38,8 @@ function renderer() {
 }
 
 function renderTemplate(hbs, name, context, site = {}) {
-  return hbs.compile(fs.readFileSync(path.join(themeRoot, name), 'utf8'))(context, {
+  hbs.templates[name] ||= hbs.compile(fs.readFileSync(path.join(themeRoot, name), 'utf8'));
+  return hbs.templates[name](context, {
     data: {site, custom: {color_scheme: 'System'}}
   });
 }
