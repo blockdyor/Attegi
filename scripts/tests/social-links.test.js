@@ -79,7 +79,7 @@ for (const [key, label] of extraFooterNetworks) {
     assert.ok(link, `Missing ${label} footer link`);
     assert.ok(link.includes(`href="${Handlebars.escapeExpression(url)}"`));
     assert.ok(link.includes('class="social-link"'));
-    assert.ok(link.includes('target="_blank" rel="noopener"'));
+    assert.ok(link.includes('target="_blank" rel="noopener nofollow"'));
     assert.match(link, /<svg\b/);
   });
 
@@ -96,6 +96,23 @@ test('all three new networks coexist with the existing footer links', () => {
   assert.equal((html.match(/<svg\b/g) || []).length, originalCount + extraFooterNetworks.length);
   for (const [, label] of extraFooterNetworks) assert.ok(html.includes(`aria-label="${label}"`));
   assert.ok(!html.includes('aria-label="Stacker News"'));
+});
+
+test('every footer icon link uses nofollow, noopener and a new tab, including RSS and email', () => {
+  const custom = Object.fromEntries(extraFooterNetworks.map(([key]) => [`${key}_url`, `https://example.com/${key}`]));
+  const legacyHtml = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, {}, null, {instagram_url: 'https://example.com/instagram', bluesky_url: 'https://example.com/bluesky'});
+  const legacyGroup = legacyHtml.match(/<div class="footer-network-links">([\s\S]*?)<\/div>/)?.[1];
+  assert.ok(legacyGroup?.includes('aria-label="Instagram"') && legacyGroup.includes('aria-label="Bluesky"'));
+  for (const html of [renderFooterLinks(custom).html, legacyGroup]) {
+    const links = Array.from(html.matchAll(/<a\b[^>]*>/g), match => match[0]);
+    assert.ok(links.length > 0);
+    for (const link of links) {
+      assert.match(link, /target="_blank"/);
+      const rel = (link.match(/\brel="([^"]+)"/)?.[1] || '').split(/\s+/);
+      assert.ok(rel.includes('nofollow'), `Missing nofollow: ${link}`);
+      assert.ok(rel.includes('noopener'), `Missing noopener: ${link}`);
+    }
+  }
 });
 
 test('new footer icons inherit link colors without external assets or colored gradients', () => {
@@ -122,6 +139,7 @@ for (const network of networks) {
     const html = renderTemplate(renderer(), 'author.hbs', {author: {name: 'Author', [network]: 'account'}, pagination: {total: 0}});
     assert.match(html, new RegExp(`class="" href="https://social.example/${network}"`));
     assert.ok(!html.includes('class="social-link"'));
+    assert.doesNotMatch(html, /\bnofollow\b/, 'Footer-only link policy must not change author profiles');
   });
 }
 
