@@ -343,7 +343,7 @@ endsParent:!0,relevance:0},{begin:/(?=[^\n])\s/,relevance:0}]}]
 }),e.C_BLOCK_COMMENT_MODE,e.C_LINE_COMMENT_MODE]
 },p=[e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,d,g,u,b,{match:/\$\d+/},c]
 ;l.contains=p.concat({begin:/\{/,end:/\}/,keywords:i,contains:["self"].concat(p)
-});const _=[].concat(m,l.contains),h=_.concat([{begin:/(\s*)\(/,end:/\)/,
+});const _=[].concat(m,l.contains),h=_.concat([{begin:/\(/,end:/\)/,
 keywords:i,contains:["self"].concat(_)}]),f={className:"params",begin:/(\s*)\(/,
 end:/\)/,excludeBegin:!0,excludeEnd:!0,keywords:i,contains:h},E={variants:[{
 match:[/class/,/\s+/,t,/\s+/,/extends/,/\s+/,n.concat(t,"(",n.concat(/\./,t),")*")],
