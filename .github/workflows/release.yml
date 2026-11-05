@@ -19,61 +19,82 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Test template rendering
         run: bun run test:templates
 
       - name: Get version
         id: version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
+          PACKAGE_VERSION=$(bun -e "console.log(require('./package.json').version)")
+          if [ -n "$RELEASE_VERSION" ]; then
+            VERSION="$RELEASE_VERSION"
           else
-            VERSION=$(bun -e "console.log(require('./package.json').version)")
+            VERSION="$PACKAGE_VERSION"
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must have the form x.y.z"
+            exit 1
+          fi
+          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "::error::Release version must match package.json"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "📌 Version: $VERSION"
 
       - name: Check if tag exists
         id: check_tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "⚠️  Tag v${{ steps.version.outputs.version }} already exists"
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            echo "::error::Tag $RELEASE_TAG already exists; publish a new version instead"
+            exit 1
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✅ Tag v${{ steps.version.outputs.version }} does not exist"
+            echo "✅ Tag $RELEASE_TAG does not exist"
           fi
 
       - name: Get previous tag
         id: prev_tag
+        env:
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
         run: |
-          if [ -n "${{ inputs.previous_tag }}" ]; then
-            PREV_TAG="${{ inputs.previous_tag }}"
+          if [ -n "$PREVIOUS_TAG" ]; then
+            PREV_TAG="$PREVIOUS_TAG"
           else
             PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           fi
-          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          if [ -n "$PREV_TAG" ]; then
+            git check-ref-format "refs/tags/$PREV_TAG"
+            git rev-parse --verify --end-of-options "refs/tags/$PREV_TAG^{commit}" >/dev/null
+          fi
+          echo "tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
           echo "📌 Previous tag: $PREV_TAG"
 
       - name: Get commit diff
         id: diff
+        env:
+          PREVIOUS_TAG: ${{ steps.prev_tag.outputs.tag }}
         run: |
-          if [ -n "${{ steps.prev_tag.outputs.tag }}" ]; then
-            COMMITS=$(git log ${{ steps.prev_tag.outputs.tag }}..HEAD --pretty=format:"- %s" --no-merges | head -50)
-            FILES_CHANGED=$(git diff --name-only ${{ steps.prev_tag.outputs.tag }}..HEAD | head -30)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMITS=$(git log -50 "refs/tags/$PREVIOUS_TAG..HEAD" --pretty=format:"- %s" --no-merges)
+            FILES_CHANGED=$(git diff --name-only "refs/tags/$PREVIOUS_TAG..HEAD" | head -30)
           else
             COMMITS=$(git log --pretty=format:"- %s" --no-merges -20)
             FILES_CHANGED=$(git diff --name-only HEAD~20..HEAD 2>/dev/null | head -30)
@@ -148,7 +169,7 @@ jobs:
           bun run compress
 
       - name: Validate theme
-        run: bunx gscan -z dist/attegi.zip
+        run: bunx gscan@6.7.0 -z dist/attegi.zip
 
       - name: Extract package info
         id: package
@@ -167,14 +188,16 @@ jobs:
 
       - name: Create and push tag
         if: steps.check_tag.outputs.exists == 'false'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.package.outputs.name }} ${{ steps.version.outputs.tag }}

@@ -14,15 +14,15 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Test template rendering
         run: bun run test:templates
@@ -37,7 +37,7 @@ jobs:
         run: bun run compress
 
       - name: Validate theme with GScan
-        run: bunx gscan -z dist/attegi.zip
+        run: bunx gscan@6.7.0 -z dist/attegi.zip
 
       - name: Extract package info
         id: package
@@ -78,7 +78,7 @@ jobs:
           PY
 
       - name: Upload theme artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ${{ steps.package.outputs.name }}-v${{ steps.package.outputs.version }}
           path: dist/artifact
@@ -86,7 +86,7 @@ jobs:
 
       - name: Create release and attach zip
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           name: ${{ steps.package.outputs.name }} v${{ steps.package.outputs.version }}
           generate_release_notes: true
