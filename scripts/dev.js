@@ -45,6 +45,7 @@ if (!tasks) {
 
 const children = [];
 let shuttingDown = false;
+let shutdownCode = 0;
 
 function prefix(name, color) {
   return `${color}[${name}]${COLORS.reset}`;
@@ -90,11 +91,30 @@ function killChildren(signal = 'SIGTERM') {
 }
 
 async function shutdown(code = 0, signal = 'SIGTERM') {
+  if (code !== 0) shutdownCode = code;
   if (shuttingDown) return;
   shuttingDown = true;
   killChildren(signal);
-  await Promise.allSettled(children.map((child) => child.proc.exited));
-  process.exit(code);
+  const results = await Promise.allSettled(children.map((child) => child.proc.exited));
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error('[dev] Child wait failed:', result.reason);
+      shutdownCode = 1;
+    }
+  }
+  process.exit(shutdownCode);
+}
+
+function shutdownFailed(error) {
+  shuttingDown = true;
+  console.error('[dev] Shutdown failed:', error);
+  killChildren();
+  process.exit(1);
+}
+
+function taskFailed(error) {
+  console.error('[dev] Task failed:', error);
+  shutdown(1).catch(shutdownFailed);
 }
 
 function spawnTask(task) {
@@ -111,9 +131,11 @@ function spawnTask(task) {
 
   pipeStream(proc.stdout, process.stdout, task.name, task.color).catch((error) => {
     writeLine(process.stderr, task.name, COLORS.red, `stdout pipe failed: ${error.message}`);
+    taskFailed(error);
   });
   pipeStream(proc.stderr, process.stderr, task.name, task.color).catch((error) => {
     writeLine(process.stderr, task.name, COLORS.red, `stderr pipe failed: ${error.message}`);
+    taskFailed(error);
   });
 
   proc.exited.then((code) => {
@@ -123,23 +145,26 @@ function spawnTask(task) {
 
     if (code === 0) {
       writeLine(process.stdout, task.name, task.color, `${COLORS.dim}exited normally${COLORS.reset}`);
-      shutdown(0);
-      return;
+      return shutdown(0);
     }
 
     writeLine(process.stderr, task.name, COLORS.red, `exited with code ${code}`);
-    shutdown(code || 1);
-  });
+    return shutdown(code || 1);
+  }).catch(taskFailed);
 }
 
 process.on('SIGINT', () => {
-  shutdown(0, 'SIGINT');
+  shutdown(0, 'SIGINT').catch(shutdownFailed);
 });
 
 process.on('SIGTERM', () => {
-  shutdown(0, 'SIGTERM');
+  shutdown(0, 'SIGTERM').catch(shutdownFailed);
 });
 
-for (const task of tasks) {
-  spawnTask(task);
+try {
+  for (const task of tasks) {
+    spawnTask(task);
+  }
+} catch (error) {
+  taskFailed(error);
 }
