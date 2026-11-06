@@ -152,7 +152,7 @@ const groups = {
         const candidate=load(), oracle=load(original);let rows=0;
         assert.equal(candidate.listLanguages().length,36);
         assert.deepEqual(Array.from(candidate.listLanguages()),Array.from(oracle.listLanguages()));
-        assert.deepEqual(Object.keys(candidate).sort(),Object.keys(oracle).sort());
+        assert.deepEqual(Object.keys(candidate).sort((a,b)=>a<b?-1:a>b?1:0),Object.keys(oracle).sort((a,b)=>a<b?-1:a>b?1:0));
         function record(api,code,language,ignoreIllegals){
             const E=api.highlight('',{language})._emitter.constructor,chunks=[];
             class Recording extends E {addText(t){if(t)chunks.push(t);return super.addText(t);}}
