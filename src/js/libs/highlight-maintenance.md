@@ -35,11 +35,30 @@ All issue IDs share prefix `AaGqubYQiPLUZgo8aW`.
 | 2U | S2871 | 400:11379–400:11383 | Same on 73 combined pseudo-selector strings. |
 | 2X | S8786 | 421:33–421:60 | Prefix the Bash function begin with `\b`; preserve numeric/awkward names and avoid retrying each suffix of a word. |
 | 2_ | S8786 | 1191:6–1191:80 | Prefix VB directive begin with `^`; preserve line-start indentation and avoid retrying each indentation suffix. |
+| 2j | S8786 | 756:17–756:33 | Reference-link lookahead becomes cached bracket dispatch, preserving permissive labels and relevance. |
+| 2k | S8786 | 757:6–757:69 | Known-scheme link variant uses the same reverse index and its original priority/relevance. |
+| 2l | S8786 | 759:21–759:32 | Generic-scheme link variant uses the same indexed recognition. |
+| 2m | S8786 | 760:20–760:43 | Relative-link variant uses the same indexed recognition. |
+| 2n | S8786 | 761:6–761:22 | General/empty-label link variant uses the same indexed recognition. |
 
 Every comparator is `(a,b)=>a<b?-1:a>b?1:0`, not locale-dependent
 `localeCompare`. Existing `.reverse()` calls and exact array order are retained.
 The actual build copies this vendor file without minifying it, preserving the
 statement forms and lazy `highlight.pack.js` filename.
+
+The five Markdown link lookaheads now share a reverse index with O(n)
+preprocessing/storage and constant-size per-candidate mask checks. A final
+unscoped zero-relevance bracket fallback preserves later valid candidates and
+existing definition priority after rejected candidates. The cached input is
+refreshed even when a separately decoded string compares equal, avoiding
+repeated length-dependent equality work. This adds bounded fallback overhead
+and linear memory; it does not certify unrelated Markdown rules.
+
+`highlight-markdown-rdos.test.js` retains feature/priority and deterministic
+fuzz comparisons, and adds invalid-then-valid streams across all variants and
+four JS line separators, existing Markdown modes, nested calls and fresh equal
+buffers. Per-variant work counts and structural arguments are separate from
+process safety timeouts; CI has no wall-clock performance ceiling assertion.
 
 ## Regression evidence and repeat commands
 
@@ -77,8 +96,8 @@ behavioral comparisons already pass there, as expected for style-only repairs.
 Build verification is explicitly skipped unless `HIGHLIGHT_VERIFY_BUILD=1`.
 GScan compatibility is not Sonar analysis. These tests are bounded regression
 coverage, not exhaustive input/browser proof or regex safety evidence. The
-recursive JS parameter, Bash function and VB directive occurrences are repaired
-locally; other original S8786 findings still require triage/fixes and a fresh
+recursive JS parameter, Bash function, VB directive and five Markdown link
+occurrences are repaired locally; other original S8786 findings still require triage/fixes and a fresh
 Sonar analysis is required to establish actual issue status. The exact prepatch
 oracle is retained through original-factory excerpts and inverse grammar,
 statement and sort edits, without changing the pinned checksum.
