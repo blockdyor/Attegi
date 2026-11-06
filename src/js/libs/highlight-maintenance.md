@@ -126,18 +126,64 @@ Java Javadoc (2h) and Java method (2i) remain unchanged and unrepaired.
 Perl attribute eligibility indexes closing parentheses within the original dot
 boundaries. Accepted arguments consume the whole original span; same-position
 prefix and buffered skip-mode whitespace fallbacks retain declaration ends and
-raw emitter chunks. Ruby indexes the last
-matching delimiter line and checks each opener against its original word/header
-constraints. Both retain one input; fresh equal references are rebound. Reentry
-can evict and rebuild these indexes, so their bounds do not cover arbitrary
-repeated custom-emitter reentry or unrelated Perl declaration ends/Ruby prompts.
+raw emitter chunks. Function declaration ends now use a whitespace or single-
+character candidate and a reverse index of whitespace ends and eligible `);`/`){`
+closes. This removes both copies of the restartable optional-argument scan,
+not only the function bridge. The class bridge was redundant and is removed.
+Whitespace skip rejects only at a valid declaration end, allowing the parent
+end at the same position. Whitespace before `(` may cross lines; the argument
+body cannot cross LF, CR, U+2028 or U+2029, matching the original JS dot.
+The entire earliest accepted excluded span is retained, including the permissive
+`sub f (bad; ! (valid);` case. The index uses O(input length) time/storage with
+constant-size candidate checks, and refreshes equal fresh input references.
+
+Ruby indexes the last matching delimiter line and checks each opener against
+its original word/header constraints. Both retain one input. Reentry can evict
+and rebuild these indexes, so their bounds do not cover arbitrary repeated
+custom-emitter reentry or unrelated grammar paths.
 
 These changes preserve tested rendered results, captures used by stock parsing,
 relevance, illegality and rankings, not every internal event: Perl begin callbacks
-see the argument-free prefix, Ruby loses the lookahead capture, and declaration
-bridging changes matcher events. `highlight-perl-ruby-rdos.test.js` checks actual
-compiled callers, original-byte integrity before either VM, failed/later valid
-candidates, complete accepted spans, one-time normal-emitter reentry and work.
+see the argument-free prefix, Ruby loses the lookahead capture, and Perl function
+end callbacks now see primitive candidates rather than the old full lexeme and
+optional capture. The full accepted end is provided by the internal opt-in below.
+`highlight-perl-ruby-rdos.test.js` checks actual compiled callers, original-byte
+integrity before either VM, failed/later valid candidates, complete accepted
+spans, nonempty custom-emitter chunks, one-time normal-emitter reentry and work.
+
+## Narrow matcher-core correction and internal end-span hook
+
+Rejected begins retain the remaining parent-end/illegal rules even after the
+last begin. A later full-matcher restart resets its rule offset; an ignored begin
+is not recorded as an entered mode for the zero-width begin/end guard. Rejected
+text is preserved, never indexed as a match array when it is already a string.
+The deliberately corrected custom grammars are rejected last COMMENT children
+at space/`to` parent ends, rejected root begins overlapping illegal matches,
+and rejected zero-width begins. Their formerly lost ends/illegal results and
+literal `undefined` output are not compatibility requirements. Stock COMMENT,
+INI `foo`, GraphQL `BEGIN`, Swift rejection-context text and the ordinary corpus
+remain checked against the original.
+
+Only an accepted `on:end` callback may set its fresh response's own `_endLexeme`.
+It must be a nonempty string, at least as long as the original native candidate,
+exactly matching the real input at the unchanged match index and within bounds.
+Multi-capture end scopes reject the override instead of synthesizing captures.
+Invalid overrides use existing debug exceptions/safe-mode error reporting;
+callback data is retained. Ignored/inherited fields do not opt in. The accepted
+value is highlight/match-local, reset before each end check and never stored in
+compiled `response.data`. Recursive `endsWithParent` retains only the accepting
+callback's value. The value is captured locally before emitter callbacks can
+reenter highlighting. No top-level public API or default response keys change;
+callbacks without this opt-in retain their pre-callback lexeme-capture and shared
+data semantics. This is an end-only internal extension, not a begin-span API,
+not a capture-array rewrite, and not a fix for contradictory existing mode flags.
+
+`highlight-core-span.test.js` covers rejection RED cases, span validation and
+callback mutation, recursive parent ends, endsParent/returnEnd, included/wrapped/
+excluded ends, non-opt-in callbacks, reentry, and raw IR/nonempty chunks/top-mode
+state across all 36 registrations and 71 aliases. Two exact base-core inverse
+excerpts precede the existing 24 inverse objects; the existing Perl inverse
+already restores the complete original factory and is not duplicated.
 
 `../../../scripts/tests/highlight-vendor-quality.test.js` exercises the actual
 bundled API and all 36 registrations. It compares HTML, relevance, illegal status,

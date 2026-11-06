@@ -146,6 +146,157 @@ test('bounded warmed complete-highlighter witnesses preserve exact results', () 
     console.log('PERL_RUBY_BENCHMARK_JSON=' + JSON.stringify(rows));
 }, 120000);
 
+test('Perl trailing whitespace cannot reuse an earlier declaration close at input offset zero', () => {
+    for(const code of ['(x); sub f   ', '(x); sub f\n\t', '(x); sub f :a(x)   ']) {
+        expect(detailed(after,code)).toEqual(detailed(before,code));
+    }
+});
+
+test('Perl declaration parent and bridge native restart scans are removed together', () => {
+    result(after, 'sub f !; class F !;', 'perl');
+    for (const scope of ['function','class']) {
+        const mode = after.getLanguage('perl').contains.find(m => m.scope === scope);
+        expect(mode.contains.some(m => m.endsParent)).toBe(false);
+        expect(mode.matcher.rules.every(([pattern]) => !String(pattern).includes('.*?'))).toBe(true);
+        if (scope === 'function') {
+            expect(mode.endRe.source).toBe(String.raw`\s+|[({;]`);
+            expect(typeof mode['on:end']).toBe('function');
+            expect(typeof mode.contains.at(-1)['on:begin']).toBe('function');
+        }
+    }
+});
+
+function detailed(api, code, language = 'perl', reentry = false) {
+    const Emitter = api.highlight('warmup', { language })._emitter.constructor;
+    const chunks = [];
+    let active = false, entered = false;
+    class Recording extends Emitter {
+        addText(text) {
+            if (text && !active) chunks.push(text);
+            if (reentry && !entered && (text.includes('sub') || text.includes(':a'))) {
+                entered = true;
+                active = true;
+                try { api.highlight('sub inner (wrong; ! (ok); print 9;', { language:'perl' }); }
+                finally { active = false; }
+            }
+            return super.addText(text);
+        }
+    }
+    api.configure({__emitter:Recording});
+    let r;
+    try { r = api.highlight(code, {language, ignoreIllegals:false}); }
+    finally { api.configure({__emitter:Emitter}); }
+    if(reentry)expect(entered).toBe(true);
+    expect(r.errorRaised).toBeUndefined();
+    const tops = [];
+    for (let m=r._top; m; m=m.parent) tops.push({scope:m.scope,skip:m.skip,excludeEnd:m.excludeEnd,returnEnd:m.returnEnd});
+    return JSON.parse(JSON.stringify({value:r.value,relevance:r.relevance,illegal:r.illegal,language:r.language,
+        ir:r._emitter.rootNode,chunks,tops}));
+}
+test('Perl indexed declaration ends preserve complete excluded spans and nonempty emitter chunks', () => {
+    for (const prefix of ['sub f','method f','class F']) for (const gap of whitespace) for (const tail of [
+        '(x); print 42;', '(x){ 42; }', '(bad; ! (valid); print 42;', '(bad) ! (valid); print 42;',
+        '((;x); print 42;', '(x); y);', '(x\ny); print 42;', '(x\ry);', '(x\u2028y);', '(x\u2029y);',
+        '\n(x); print 42;', '!', '((((!', '); print 42;', '; print 42;', '{42;}', ':a(x) (z); print 42;'
+    ]) {
+        const code=prefix+gap.repeat(3)+tail;
+        expect(detailed(after,code)).toEqual(detailed(before,code));
+    }
+});
+test('Perl accepted end callbacks expose primitive candidates only to the new opt-in handler', () => {
+    const code='sub f (bad; ! (valid); print 42;';
+    result(after,'sub f !','perl'); result(before,'sub f !','perl');
+    const actual=after.getLanguage('perl').contains.find(m=>m.scope==='function');
+    const expected=before.getLanguage('perl').contains.find(m=>m.scope==='function');
+    const spans=[], native=[];
+    for(const [mode,isNew] of [[actual,true],[expected,false]]) {
+        const callback=mode['on:end'];
+        mode['on:end']=(m,r)=>{
+            if(callback)callback(m,r);
+            if(!r.isMatchIgnored)spans.push(r._endLexeme ?? m[0]);
+            if(isNew)native.push(m[0]);
+        };
+        try { detailed(isNew?after:before,code); } finally {mode['on:end']=callback;}
+    }
+    expect(spans).toEqual([' (bad; ! (valid);',' (bad; ! (valid);']);
+    expect(native).toEqual([' ']);
+});
+test('Perl declaration indexed work and matcher calls are bounded on fresh equal missing/valid spans', () => {
+    result(after,'sub f !','perl');
+    const mode=after.getLanguage('perl').contains.find(m=>m.scope==='function');
+    const exec=mode.matcher.exec;
+    const rows=[];
+    for(const n of [64,128,256,512]) for(const tail of ['!','); print 42;']) {
+        const code='sub f '+ '('.repeat(n)+tail;
+        for(let repeat=0;repeat<2;repeat++) {
+            const calls=[];
+            mode.matcher.exec=function(input){const m=exec.call(this,input);calls.push({start:this.lastIndex,index:m?.index,text:m?.[0],type:m?.type});return m;};
+            try {expect(detailed(after,JSON.parse(JSON.stringify(code)))).toEqual(detailed(before,code));}
+            finally {mode.matcher.exec=exec;}
+            expect(calls.length).toBeLessThanOrEqual(code.length*3);
+            expect(calls.every(m=>!m.text || m.text.length===1 || /^\s+$/.test(m.text) || /^[A-Za-z]+$/.test(m.text))).toBe(true);
+            rows.push({n,tail,repeat,calls:calls.length,bytes:code.length});
+        }
+    }
+    console.log('PERL_DECLARATION_MATCHER_WORK='+JSON.stringify(rows));
+});
+test('Perl declaration index visits each code unit once and reuses only equal input indexes', () => {
+    const context = vm.createContext({console});
+    vm.runInContext(`var indexWork={steps:0}; const nativeTest=RegExp.prototype.test;
+        RegExp.prototype.test=function(input){if(this.source==='\\\\s' && input.length===1)indexWork.steps++;
+        return nativeTest.call(this,input);};`,context);
+    vm.runInContext(candidateSource,context);
+    expect(candidateSource.includes('}\ndeclarationInput=input;\nconst at=')).toBe(true);
+    const api=context.hljs;
+    const rows=[];
+    for(const n of [64,128,256,512]) for(const tail of ['!', '); print 42;', '\n(x);']) {
+        const code='sub f '+ '('.repeat(n)+tail;
+        for(let repeat=0;repeat<2;repeat++) {
+            context.indexWork.steps=0;
+            expect(detailed(api,JSON.parse(JSON.stringify(code)))).toEqual(detailed(before,code));
+            expect(context.indexWork.steps).toBe(repeat?0:code.length);
+            rows.push({n,tail,repeat,indexSteps:context.indexWork.steps,bytes:code.length});
+        }
+    }
+    console.log('PERL_DECLARATION_INDEX_WORK='+JSON.stringify(rows));
+});
+
+test('Perl ATTR prefixes still have consuming or exit guards in all five compiled callers', () => {
+    result(after,'sub f !; class F !; $1; $x; $!;','perl');
+    const seen=new Set(),callers=[];
+    function visit(mode) {
+        if(seen.has(mode))return;seen.add(mode);
+        for(let i=0;i<mode.contains.length;i++) {
+            const child=mode.contains[i];
+            if(child.scope==='attr' && child['on:begin']) {
+                expect(mode.contains[i+1].beginRe.source).toBe(child.beginRe.source);
+                expect(mode.contains[i+1]['on:begin']).toBeUndefined();
+                if(mode.scope==='variable')expect(mode.endRe.source).toBe(String.raw`\B|\b`);
+                else expect(mode.contains.at(-1).beginRe.source).toBe(String.raw`\s+`);
+                callers.push(mode);
+            }
+            visit(child);
+        }
+        if(mode.starts)visit(mode.starts);
+    }
+    visit(after.getLanguage('perl'));
+    expect(callers).toHaveLength(5);
+    for(const prefix of ['$1','$x','$!','sub f','class F']) for(const n of [32,64,128]) {
+        for(const tail of ['!',': !',':word!',':word(x);',':word(x\ny);','(bad; ! (valid);']) {
+            const code=prefix+' '.repeat(n)+tail;
+            expect(detailed(after,code)).toEqual(detailed(before,code));
+        }
+    }
+});
+
+test('Perl declaration end span stays activation-local across ordinary emitter reentry', () => {
+    for(const code of ['sub f (bad; ! (valid); print 42;', 'sub f :a(x) (z); class F {42;}',
+        'sub f '+ '('.repeat(128)+'!']) {
+        expect(detailed(after,code,'perl',true)).toEqual(detailed(before,code,'perl',true));
+        expect(detailed(after,code)).toEqual(detailed(before,code));
+    }
+});
+
 function traceMatcher(api, language, scope, code) {
     result(api, 'warmup', language);
     const mode = api.getLanguage(language).contains.find(m => m.scope === scope);
@@ -171,7 +322,12 @@ test('2p actual combined matchers consume full failed runs and complete successf
         const accepted = traceMatcher(after, 'perl', scope, prefix + gap + suffix);
         const original = traceMatcher(before, 'perl', scope, prefix + gap + suffix);
         const originalEnd = original.find(row => row.type === 'end');
-        expect(accepted.some(row => row.text === originalEnd.text)).toBe(true);
+        // The native candidate is primitive; the opt-in callback supplies the complete span.
+        if(scope === 'function') {
+            expect(accepted.some(row => row.type === 'end' && row.text === gap)).toBe(true);
+            expect(originalEnd.text).toBe(gap + suffix);
+        } else expect(accepted.some(row => row.text === originalEnd.text)).toBe(true);
+        expect(detailed(after,prefix+gap+suffix)).toEqual(detailed(before,prefix+gap+suffix));
         compare(prefix + gap + suffix + ' print 42; }', 'perl');
     }
 });

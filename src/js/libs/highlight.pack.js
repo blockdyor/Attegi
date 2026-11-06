@@ -147,9 +147,9 @@ this.rules.push([e,n]),"begin"===n.type&&this.count++}exec(e){
 const n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
 ;let t=n.exec(e)
 ;if(this.resumingScanAtSamePosition())if(t&&t.index===this.lastIndex);else{
-const n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,t=n.exec(e)}
-return t&&(this.regexIndex+=t.position+1,
-this.regexIndex===this.count&&this.considerAll()),t}}
+const n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,this.regexIndex=0,t=n.exec(e)}
+// Rejection must retain end/illegal alternatives after the last begin.
+return t&&(this.regexIndex+=t.position+1),t}}
 if(e.compilerExtensions||(e.compilerExtensions=[]),
 e.contains&&e.contains.includes("self"))throw Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.")
 ;return e.classNameAliases=a(e.classNameAliases||{}),function t(r,s){const o=r
@@ -210,13 +210,20 @@ function m(e,n){
 return e.scope&&"string"==typeof e.scope&&S.openNode(k.classNameAliases[e.scope]||e.scope),
 e.beginScope&&(e.beginScope._wrap?(u(C,k.classNameAliases[e.beginScope._wrap]||e.beginScope._wrap),
 C=""):e.beginScope._multi&&(b(e.beginScope,n),C="")),M=Object.create(e,{parent:{
-value:M}}),M}function _(e,t,a){let i=((e,n)=>{const t=e&&e.exec(n)
+value:M}}),M}let endLexeme;function _(e,t,a){let i=((e,n)=>{const t=e&&e.exec(n)
 ;return t&&0===t.index})(e.endRe,a);if(i){if(e["on:end"]){const a=new n(e)
-;e["on:end"](t,a),a.isMatchIgnored&&(i=!1)}if(i){
+;e["on:end"](t,a);if(a.isMatchIgnored)i=!1;
+else if(Object.prototype.hasOwnProperty.call(a,"_endLexeme"))endLexeme=a._endLexeme;
+}if(i){
 for(;e.endsParent&&e.parent;)e=e.parent;return e}}
 if(e.endsWithParent)return _(e.parent,t,a)}function h(e){
-return 0===M.matcher.regexIndex?(C+=e[0],1):(I=!0,0)}function y(e){
-const n=e[0],a=t.substring(e.index),i=_(M,e,a);if(!i)return Y;const r=M
+return 0===M.matcher.regexIndex?(C+=e,1):(I=!0,0)}function y(e){
+// Only accepted end callbacks opt in; existing match-array mutation semantics stay unchanged.
+endLexeme=Y;const original=e[0],index=e.index,a=t.substring(index),i=_(M,e,a);if(!i)return Y;
+if(endLexeme!==Y&&(typeof endLexeme!=="string"||!endLexeme.length||endLexeme.length<original.length||
+e.index!==index||index+endLexeme.length>t.length||!t.startsWith(endLexeme,index)||M.endScope&&M.endScope._multi))
+throw Error("Invalid end lexeme");
+const n=endLexeme===Y?original:endLexeme,r=M
 ;M.endScope&&M.endScope._wrap?(g(),
 u(n,M.endScope._wrap)):M.endScope&&M.endScope._multi?(g(),
 b(M.endScope,e)):r.skip?C+=n:(r.returnEnd||r.excludeEnd||(C+=n),
@@ -227,12 +234,12 @@ let w={};function v(a,r){const o=r&&r[0];if(C+=a,null==o)return g(),0
 ;if("begin"===w.type&&"end"===r.type&&w.index===r.index&&""===o){
 if(C+=t.slice(r.index,r.index+1),!s){const n=Error(`0 width match regex (${e})`)
 ;throw n.languageName=e,n.badRule=w.rule,n}return 1}
-if(w=r,"begin"===r.type)return(e=>{
+if("begin"===r.type)return(e=>{
 const t=e[0],a=e.rule,i=new n(a),r=[a.__beforeBegin,a["on:begin"]]
 ;for(const n of r)if(n&&(n(e,i),i.isMatchIgnored))return h(t)
-;return a.skip?C+=t:(a.excludeBegin&&(C+=t),
+;w=e;return a.skip?C+=t:(a.excludeBegin&&(C+=t),
 g(),a.returnBegin||a.excludeBegin||(C=t)),m(a,e),a.returnBegin?0:t.length})(r)
-;if("illegal"===r.type&&!i){
+;w=r;if("illegal"===r.type&&!i){
 const e=Error('Illegal lexeme "'+o+'" for mode "'+(M.scope||"<unnamed>")+'"')
 ;throw e.mode=M,e}if("end"===r.type){const e=y(r);if(e!==Y)return e}
 if("illegal"===r.type&&""===o)return r.index===t.length||(C+="\n"),1
@@ -929,6 +936,27 @@ attrInput=input;
 const open=/\s*\(/y;open.lastIndex=match.index+match[0].length;
 return !!open.exec(input)&&attrOpens.has(open.lastIndex-1);
 }
+// Index the first eligible close before a JS dot-line boundary, and each whitespace run.
+let declarationInput,declarationWhitespace,declarationCloses;
+function declarationEnd(match){
+const input=match.input;
+if(input!==declarationInput){
+declarationWhitespace=new Uint32Array(input.length+1);
+declarationWhitespace[input.length]=input.length;
+declarationCloses=new Uint32Array(input.length+1);
+let close=0;
+for(let i=input.length-1;i>=0;i--){
+const ch=input[i];
+declarationWhitespace[i]=/\s/.test(ch)?declarationWhitespace[i+1]:i;
+if(ch==="\n"||ch==="\r"||ch==="\u2028"||ch==="\u2029")close=0;
+else if(ch===")"&&(input[i+1]===";"||input[i+1]==="{"))close=i+2;
+declarationCloses[i]=close;
+}
+}
+declarationInput=input;
+const at=match.index,ch=input[at],open=declarationWhitespace[at];
+return ch===";"||ch==="{"?at+1:input[open]==="("?declarationCloses[open]:0;
+}
 const n=e.regex,t=/[dualxmsipngr]{0,12}/,a={
 $pattern:/[\w.]+/,
 keyword:"abs accept alarm and atan2 bind binmode bless break caller chdir chmod chomp chop chown chr chroot class close closedir connect continue cos crypt dbmclose dbmopen defined delete die do dump each else elsif endgrent endhostent endnetent endprotoent endpwent endservent eof eval exec exists exit exp fcntl field fileno flock for foreach fork format formline getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname gethostent getlogin getnetbyaddr getnetbyname getnetent getpeername getpgrp getpriority getprotobyname getprotobynumber getprotoent getpwent getpwnam getpwuid getservbyname getservbyport getservent getsockname getsockopt given glob gmtime goto grep gt hex if index int ioctl join keys kill last lc lcfirst length link listen local localtime log lstat lt ma map method mkdir msgctl msgget msgrcv msgsnd my ne next no not oct open opendir or ord our pack package pipe pop pos print printf prototype push q|0 qq quotemeta qw qx rand read readdir readline readlink readpipe recv redo ref rename require reset return reverse rewinddir rindex rmdir say scalar seek seekdir select semctl semget semop send setgrent sethostent setnetent setpgrp setpriority setprotoent setpwent setservent setsockopt shift shmctl shmget shmread shmwrite shutdown sin sleep socket socketpair sort splice split sprintf sqrt srand stat state study sub substr symlink syscall sysopen sysread sysseek system syswrite tell telldir tie tied time times tr truncate uc ucfirst umask undef unless unlink unpack unshift untie until use utime values vec wait waitpid wantarray warn when while write x|0 xor y|0"
@@ -965,13 +993,14 @@ className:"regexp",variants:[{begin:/(m|qr)\/\//,relevance:0},{
 begin:u("(?:m|qr)?",/\//,/\//)},{begin:u("m|qr",n.either(...d,{capture:!0
 }),/\1/)},{begin:u("m|qr",/\(/,/\)/)},{begin:u("m|qr",/\[/,/\]/)},{
 begin:u("m|qr",/\{/,/\}/)}]}]},{className:"function",beginKeywords:"sub method",
-end:"(\\s*\\(.*?\\))?[;{]",excludeEnd:!0,relevance:5,contains:[e.TITLE_MODE,s,
-// End wins before the whitespace fallback, with the entire original excluded lexeme.
-{begin:/(\s*\(.*?\))?[;{]/,returnBegin:!0,end:/(\s*\(.*?\))?[;{]/,
-excludeEnd:!0,endsParent:!0,relevance:0},{match:/\s+/,skip:!0,relevance:0}]
+end:/\s+|[({;]/,excludeEnd:!0,relevance:5,"on:end":(match,response)=>{
+const end=declarationEnd(match);
+if(end)response._endLexeme=match.input.slice(match.index,end);else response.ignoreMatch();
+},contains:[e.TITLE_MODE,s,{match:/\s+/,skip:!0,relevance:0,"on:begin":(match,response)=>{
+if(declarationEnd(match))response.ignoreMatch();
+}}]
 },{className:"class",beginKeywords:"class",end:"[;{]",excludeEnd:!0,relevance:5,
-contains:[e.TITLE_MODE,s,c,{begin:/[;{]/,returnBegin:!0,end:/[;{]/,
-excludeEnd:!0,endsParent:!0,relevance:0},{match:/\s+/,skip:!0,relevance:0}]},{begin:"-\\w\\b",relevance:0},{begin:"^__DATA__$",
+contains:[e.TITLE_MODE,s,c,{match:/\s+/,skip:!0,relevance:0}]},{begin:"-\\w\\b",relevance:0},{begin:"^__DATA__$",
 end:"^__END__$",subLanguage:"mojolicious",contains:[{begin:"^@@.*",end:"$",
 className:"comment"}]}];return i.contains=b,r.contains=b,{name:"Perl",
 aliases:["pl","pm"],keywords:a,contains:b}},grmr_php:e=>{
