@@ -16,8 +16,20 @@ const a=n[t],i=typeof a;"object"!==i&&"function"!==i||Object.isFrozen(a)||e(a)
 void 0===e.data&&(e.data={}),this.data=e.data,this.isMatchIgnored=!1}
 ignoreMatch(){this.isMatchIgnored=!0}}function t(e){
 return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;")
-}function a(e,...n){const t=Object.create(null);for(const n in e)t[n]=e[n]
-;return n.forEach(e=>{for(const n in e)t[n]=e[n]}),t}const i=e=>!!e.scope
+}const ownedRecognizers=new WeakMap,compiledRecognizers=new WeakMap;
+function ownRecognizer(rule,span){
+ownedRecognizers.set(rule,{shape:Object.assign({},rule),span});return rule;
+}
+function ownedRecognizer(rule){
+const record=ownedRecognizers.get(rule);
+const proto=Object.getPrototypeOf(rule);
+return record&&(proto===null||proto===Object.prototype)&&
+Reflect.ownKeys(rule).length===Object.keys(record.shape).length&&
+Reflect.ownKeys(rule).every(key=>{const descriptor=Object.getOwnPropertyDescriptor(rule,key);
+return Object.prototype.hasOwnProperty.call(record.shape,key)&&Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.value===record.shape[key];})?record:null;
+}
+function a(e,...n){const t=Object.create(null);for(const n in e)t[n]=e[n]
+;return n.forEach(e=>{for(const n in e)t[n]=e[n]}),ownedRecognizers.has(e)&&ownedRecognizers.set(t,ownedRecognizers.get(e)),t}const i=e=>!!e.scope
 ;class r{constructor(e,n){
 this.buffer="",this.classPrefix=n.classPrefix,e.walk(this)}addText(e){
 this.buffer+=t(e)}openNode(e){if(!i(e))return;const n=((e,{prefix:n})=>{
@@ -144,18 +156,45 @@ if(this.multiRegexes[e])return this.multiRegexes[e];const n=new t
 // Resumed matches are usable only at the current position; do not search a discarded suffix.
 n.compile(),e&&n.matcherRe&&(n.matcherRe=RegExp(n.matcherRe.source,n.matcherRe.flags+"y")),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){
 return 0!==this.regexIndex}considerAll(){this.regexIndex=0}addRule(e,n){
-this.rules.push([e,n]),"begin"===n.type&&this.count++}exec(e){
-const n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
+this.rules.push([e,n]),"begin"===n.type&&this.count++,
+n.rule&&compiledRecognizers.has(n.rule)&&(this.hasOwnedFilter=!0)}execOwned(input,match,offset,flags){
+flags=flags.replace(/[gy]/g,"");
+// Only a genuine owned rejection enters Unicode-safe local continuation.
+const advance=at=>{const c=input.charCodeAt(at),d=input.charCodeAt(at+1);
+return at+(flags.includes("u")&&c>=55296&&c<=56319&&d>=56320&&d<=57343?2:1)};
+while(match){
+const owned=match.rule&&compiledRecognizers.get(match.rule);
+if(owned){const end=owned.span(input,match.index,flags);
+// Materialize the original full begin before the parser captures its lexeme; no mode lowering.
+if(end>match.index){match[0]=input.slice(match.index,end);this.regexIndex=offset;return match;}
+}else{this.regexIndex=offset;return match;}
+let cursor=match.index;
+for(;;){
+const matcher=this.getMatcher(offset);matcher.lastIndex=cursor;match=matcher.exec(input);
+if(matcher.matcherRe)flags=matcher.matcherRe.flags.replace(/[gy]/g,"");
+if(offset&&(!match||match.index!==cursor)||match&&match.index<cursor){
+cursor=advance(cursor);offset=0;if(cursor>input.length)return null;continue;
+}
+break;
+}
+if(match)offset+=match.position+1;
+}
+return null;
+}exec(e){
+let n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
 ;let t=n.exec(e)
 ;if(this.resumingScanAtSamePosition())if(t&&t.index===this.lastIndex);else{
-const n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,this.regexIndex=0,t=n.exec(e)}
+n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,this.regexIndex=0,t=n.exec(e)}
+if(this.hasOwnedFilter&&t&&compiledRecognizers.has(t.rule))return this.execOwned(e,t,this.regexIndex+t.position+1,n.matcherRe.flags);
 // Rejection must retain end/illegal alternatives after the last begin.
 return t&&(this.regexIndex+=t.position+1),t}}
 if(e.compilerExtensions||(e.compilerExtensions=[]),
 e.contains&&e.contains.includes("self"))throw Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.")
 ;return e.classNameAliases=a(e.classNameAliases||{}),function t(r,s){const o=r
 ;if(r.isCompiled)return o
-;[R,L,Z,F].forEach(e=>e(r,s)),e.compilerExtensions.forEach(e=>e(r,s)),
+;[R,L,Z,F].forEach(e=>e(r,s)),e.compilerExtensions.forEach(e=>e(r,s));
+const owned=s&&ownedRecognizer(r);
+
 r.__beforeBegin=null,[D,I,B].forEach(e=>e(r,s)),r.isCompiled=!0;let c=null
 ;return"object"==typeof r.keywords&&r.keywords.$pattern&&(r.keywords=Object.assign({},r.keywords),
 c=r.keywords.$pattern,
@@ -169,8 +208,8 @@ r.contains||(r.contains=[]),r.contains=[].concat(...r.contains.map(e=>(e=>(e.var
 variants:null},n))),e.cachedVariants?e.cachedVariants:Q(e)?a(e,{
 starts:e.starts?a(e.starts):null
 }):Object.isFrozen(e)?a(e):e))("self"===e?r:e))),r.contains.forEach(e=>{t(e,o)
-}),r.starts&&t(r.starts,s),o.matcher=(e=>{const n=new i
-;return e.contains.forEach(e=>n.addRule(e.begin,{rule:e,type:"begin"
+}),r.starts&&t(r.starts,s),owned&&compiledRecognizers.set(o,{span:owned.span}),o.matcher=(e=>{const n=new i
+;return e.contains.forEach(e=>n.addRule(compiledRecognizers.has(e)?/[_A-Za-z]/:e.begin,{rule:e,type:"begin"
 })),e.terminatorEnd&&n.addRule(e.terminatorEnd,{type:"end"
 }),e.illegal&&n.addRule(e.illegal,{type:"illegal"}),n})(o),o}(e)}function Q(e){
 return!!e&&(e.endsWithParent||Q(e.starts))}class X extends Error{
@@ -683,17 +722,33 @@ match:/-?\.\d(_?\d)*([eE][+-]?\d(_?\d)*)?i?/,relevance:0},{
 match:/-?\b\d(_?\d)*(\.(\d(_?\d)*)?)?([eE][+-]?\d(_?\d)*)?i?/,relevance:0}]},{
 begin:/:=/},{className:"function",beginKeywords:"func",end:"\\s*(\\{|$)",
 excludeEnd:!0,contains:[e.TITLE_MODE,{className:"params",begin:/\(/,end:/\)/,
-endsParent:!0,keywords:n,illegal:/["']/}]}]}},grmr_graphql:e=>{const n=e.regex
-;return{name:"GraphQL",aliases:["gql"],case_insensitive:!0,disableAutodetect:!1,
+endsParent:!0,keywords:n,illegal:/["']/}]}]}},grmr_graphql:e=>{const n=e.regex;
+let input,indexFlags,identifierEnd,nextNonspace;
+function index(value,flags){
+if(input!==value||indexFlags!==flags){
+const identifier=RegExp("[_0-9A-Za-z]",flags),space=RegExp("\\s",flags);
+identifierEnd=new Uint32Array(value.length+1);
+nextNonspace=new Uint32Array(value.length+1);
+nextNonspace[value.length]=value.length;
+for(let at=value.length-1;at>=0;at--){
+identifierEnd[at]=identifier.exec(value[at])?(identifierEnd[at+1]||at+1):0;
+nextNonspace[at]=space.exec(value[at])?nextNonspace[at+1]:at;
+}
+indexFlags=flags;
+}
+input=value;
+}
+return{name:"GraphQL",aliases:["gql"],case_insensitive:!0,disableAutodetect:!1,
 keywords:{
 keyword:["query","mutation","subscription","type","input","schema","directive","interface","union","scalar","fragment","enum","on"],
 literal:["true","false","null"]},
 contains:[e.HASH_COMMENT_MODE,e.QUOTE_STRING_MODE,e.NUMBER_MODE,{
 scope:"punctuation",match:/[.]{3}/,relevance:0},{scope:"punctuation",
 begin:/[\!\(\)\:\=\[\]\{\|\}]{1}/,relevance:0},{scope:"variable",begin:/\$/,
-end:/\W/,excludeEnd:!0,relevance:0},{scope:"meta",match:/@\w+/,excludeEnd:!0},{
+end:/\W/,excludeEnd:!0,relevance:0},{scope:"meta",match:/@\w+/,excludeEnd:!0},ownRecognizer({
 scope:"symbol",begin:n.concat(/[_A-Za-z][_0-9A-Za-z]*/,n.lookahead(/\s*:/)),
-relevance:0}],illegal:[/[;<']/,/BEGIN/]}},grmr_ini:e=>{const n=e.regex,t={
+relevance:0},(value,at,flags)=>{index(value,flags);const end=identifierEnd[at];
+return end&&value[nextNonspace[end]]===":"?end:0;})],illegal:[/[;<']/,/BEGIN/]}},grmr_ini:e=>{const n=e.regex,t={
 className:"number",relevance:0,variants:[{begin:/([+-]+)?[\d]+_[\d_]+/},{
 begin:e.NUMBER_RE}]},a=e.COMMENT();a.variants=[{begin:/;/,end:/$/},{begin:/#/,
 end:/$/}];const i={className:"variable",variants:[{begin:/\$[\w\d"][\w\d_]*/},{

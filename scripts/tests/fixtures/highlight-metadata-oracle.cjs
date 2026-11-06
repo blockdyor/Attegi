@@ -4,9 +4,14 @@ const { createHash } = require('node:crypto');
 const hash = text => createHash('sha256').update(text).digest('hex');
 const source = fs.readFileSync(new URL('../../../src/js/libs/highlight.pack.js', 'file://' + __filename), 'utf8');
 const fixtureBytes = fs.readFileSync(new URL('../highlight-vendor-baseline.json', 'file://' + __filename));
-assert.equal(hash(fixtureBytes), 'da0611caaa33defe1f4324d8e63883832aec730bc6a97625c2c665dd59224f5c');
 const fixture = JSON.parse(fixtureBytes);
-assert.equal(fixture.originalFunctions.length, 27);
+assert.equal(fixture.originalFunctions.length, 29);
+// Canonical projection pins every original row, order and other metadata from da0611c.
+assert.equal(hash(JSON.stringify({...fixture, originalFunctions:fixture.originalFunctions.slice(0,27)})),
+    'f5c408418770d5e548406621ed95122a9da0899f88ce871ec5e7f7a691527171');
+const {restoreOwned} = require('./highlight-owned-reconstruction.cjs');
+const core = restoreOwned(source);
+assert.equal(hash(core), '6305f38028001c8e628e79ebdce09343687311672dc87786cec9d055d967a927');
 const old = 'n.position=this.position++,this.matchIndexes[this.matchAt]=n';
 const fixed = 'n=Object.assign({},n,{position:this.position++}),this.matchIndexes[this.matchAt]=n';
 function undoOwnership(text) {
@@ -14,7 +19,7 @@ function undoOwnership(text) {
     assert.equal(text.split(needle).length, 2);
     return text.replace(needle, old);
 }
-const base = undoOwnership(source);
+const base = undoOwnership(core);
 assert.equal(hash(base), '3a8c910fdf1aefe17c35704718529ee15673d2521cae84a427916c2ada4c2a79');
 let original = source;
 for (const row of fixture.originalFunctions) {
@@ -34,4 +39,4 @@ function load(text = source) {
     vm.runInContext(text, context);
     return context.hljs;
 }
-module.exports = { source, base, original, hash, load, undoOwnership };
+module.exports = { source, core, base, original, hash, load, undoOwnership, restoreOwned };
