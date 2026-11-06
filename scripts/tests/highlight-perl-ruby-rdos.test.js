@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { test, expect, beforeAll } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -13,7 +14,7 @@ function load(text) {
     return context.hljs;
 }
 beforeAll(() => {
-    let original = source;
+    let original = restoreComment(source);
     for (const { start, end, source: body } of fixture.originalFunctions) {
         const from = original.indexOf(start), to = original.indexOf(end, from);
         assert(from >= 0 && to > from, `Missing baseline boundary: ${start}`);

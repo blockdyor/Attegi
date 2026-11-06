@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { test, expect, beforeAll } from 'bun:test';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -9,7 +10,7 @@ const fixture = JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json'
 const scanCalls = new WeakMap();
 let before, after;
 beforeAll(() => {
-    let original = source;
+    let original = restoreComment(source);
     for (const { start, end, source: body } of fixture.originalFunctions) {
         const from = original.indexOf(start), to = original.indexOf(end, from);
         assert(from >= 0 && to > from && original.indexOf(start, from + start.length) === -1,

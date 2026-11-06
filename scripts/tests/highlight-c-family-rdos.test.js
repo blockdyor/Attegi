@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { test, expect, beforeAll } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -7,7 +8,7 @@ const source = readFileSync(new URL('../../src/js/libs/highlight.pack.js', impor
 const fixture = JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json', import.meta.url), 'utf8'));
 let original, before, after, counted, work;
 beforeAll(() => {
-    original = source;
+    original = restoreComment(source);
     for (const { start, end, source: body } of fixture.originalFunctions) {
         const from = original.indexOf(start), to = original.indexOf(end, from);
         // The helper does not exist yet when running RED on the original source.

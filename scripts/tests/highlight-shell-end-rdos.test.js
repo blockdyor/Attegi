@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { beforeAll, test, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -12,7 +13,7 @@ function load(text) {
 beforeAll(() => {
     const source = readFileSync(new URL('../../src/js/libs/highlight.pack.js', import.meta.url), 'utf8');
     const fixture = JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json', import.meta.url), 'utf8'));
-    let original = source;
+    let original = restoreComment(source);
     for (const { start, end, source: body } of fixture.originalFunctions) {
         const from = original.indexOf(start), to = original.indexOf(end, from);
         expect(from).toBeGreaterThanOrEqual(0);

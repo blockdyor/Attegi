@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { test, expect, beforeAll } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -12,7 +13,7 @@ function load(text = source) {
     return context.hljs;
 }
 beforeAll(() => {
-    original = source;
+    original = restoreComment(source);
     for (const { start, end, source: body } of fixture.originalFunctions) {
         const from = original.indexOf(start), to = original.indexOf(end, from);
         assert(from >= 0 && to > from, start);

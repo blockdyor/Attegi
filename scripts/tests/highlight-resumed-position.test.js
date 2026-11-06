@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { test, expect, beforeAll } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -12,13 +13,14 @@ let base;
 beforeAll(()=>{
     // Undo the independently pinned Java repair before authenticating the reviewed core parent.
     const java=fixture.originalFunctions.find(row=>row.start==='grmr_java:e=>{');
-    const lo=source.indexOf(java.start),hi=source.indexOf(java.end,lo);
+    const commentBase=restoreComment(source);
+    const lo=commentBase.indexOf(java.start),hi=commentBase.indexOf(java.end,lo);
     assert(lo>=0&&hi>lo);
-    const coreParent=source.slice(0,lo)+java.source+source.slice(hi);
+    const coreParent=commentBase.slice(0,lo)+java.source+commentBase.slice(hi);
     assert.equal(createHash('sha256').update(undoOwnership(restoreOwned(coreParent))).digest('hex'),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
     base=source.replace(fixed,old);
     assert.equal(createHash('sha256').update(undoOwnership(restoreOwned(coreParent).replace(fixed,old))).digest('hex'),'403710522aeafacee7eb3fd3978d66ea5408ec2795eec816ec6ae3d62f501975');
-    let original=source;
+    let original=restoreComment(source);
     for(const row of fixture.originalFunctions) {
         const lo=original.indexOf(row.start),hi=original.indexOf(row.end,lo);
         assert(lo>=0&&hi>lo);original=original.slice(0,lo)+row.source+original.slice(hi);

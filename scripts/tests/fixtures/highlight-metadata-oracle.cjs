@@ -10,7 +10,9 @@ assert.equal(fixture.originalFunctions.length, 29);
 assert.equal(hash(JSON.stringify({...fixture, originalFunctions:fixture.originalFunctions.slice(0,27)})),
     'f5c408418770d5e548406621ed95122a9da0899f88ce871ec5e7f7a691527171');
 const {restoreOwned} = require('./highlight-owned-reconstruction.cjs');
-const core = restoreOwned(source);
+const {restoreComment} = require('./highlight-comment-reconstruction.cjs');
+const commentBaseline = restoreComment(source);
+const core = restoreOwned(commentBaseline);
 assert.equal(hash(core), '6305f38028001c8e628e79ebdce09343687311672dc87786cec9d055d967a927');
 const old = 'n.position=this.position++,this.matchIndexes[this.matchAt]=n';
 const fixed = 'n=Object.assign({},n,{position:this.position++}),this.matchIndexes[this.matchAt]=n';
@@ -21,7 +23,7 @@ function undoOwnership(text) {
 }
 const base = undoOwnership(core);
 assert.equal(hash(base), '3a8c910fdf1aefe17c35704718529ee15673d2521cae84a427916c2ada4c2a79');
-let original = source;
+let original = commentBaseline;
 for (const row of fixture.originalFunctions) {
     const lo = original.indexOf(row.start), hi = original.indexOf(row.end, lo);
     assert(lo >= 0 && hi > lo);

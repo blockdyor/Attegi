@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import {test,expect,beforeAll} from 'bun:test';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -14,8 +15,8 @@ function undo(text,row){const lo=text.indexOf(row.start),hi=text.indexOf(row.end
 beforeAll(()=>{
  // Authenticate the exact parent AND original upstream before executing vendor code.
  base=source;const java=fixture.originalFunctions.find(x=>x.start===start);if(java)base=undo(base,java);
- assert.equal(hash(undoOwnership(restoreOwned(base))),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
- let original=source;for(const row of fixture.originalFunctions)original=undo(original,row);
+ assert.equal(hash(undoOwnership(restoreOwned(undo(restoreComment(source),java)))),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
+ let original=restoreComment(source);for(const row of fixture.originalFunctions)original=undo(original,row);
  original=original.replaceAll('.sort((a,b)=>a<b?-1:a>b?1:0).reverse()', '.sort().reverse()')
  .replace('grmr_wasm:e=>{const','grmr_wasm:e=>{e.regex;const')
  .replace('h=_.concat([{begin:/\\(/','h=_.concat([{begin:/(\\s*)\\(/')

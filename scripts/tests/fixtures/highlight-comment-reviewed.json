@@ -1,0 +1,37 @@
+[
+  {
+    "candidate": "function ownComment(rule,phrase){\nconst source=l(rule.begin),captures=phrase?3:1;\nconst marker=\"(?:TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):\";\nlet cachedInput,cachedFlags,eligible,full;\nconst select=(input,at,flags)=>{\nif(input!==cachedInput||flags!==cachedFlags){\nconst next=new Uint8Array(input.length+1),native=RegExp(source,flags+\"y\");\nif(phrase){\n// One whole begin per maximal space run; three fixed word windows bound overlap.\nfor(let i=0;i<input.length;){\nif(input.charCodeAt(i)!==32){i++;continue;}\nconst start=i;while(i<input.length&&input.charCodeAt(i)===32)i++;\nnative.lastIndex=start;if(native.exec(input)!==null)next.fill(1,start,i);\n}\n}else{\nconst keyword=RegExp(marker,flags+\"y\");\nfor(let i=input.length-1;i>=0;){\nif(input.charCodeAt(i)===32){i--;continue;}\nkeyword.lastIndex=i;\nif(keyword.exec(input)!==null){\nnext[i]=1;while(i>0&&input.charCodeAt(i-1)===32)next[--i]=1;\n}\ni--;\n}\n}\n// Only the latest input/actual matcher flags are retained; reentry may evict them.\ncachedInput=input;cachedFlags=flags;eligible=next;full=native;\n}\nif(!eligible[at])return null;\nfull.lastIndex=at;return full.exec(input);\n};\nconst selector=phrase?\"[ ]()()()\":\"(?:[ ]|(?=\"+marker+\"))()\";\nownedRecognizers.set(rule,{shape:Object.assign({},rule),select,selector,captures});return rule;\n}\nfunction ownedRecognizer(rule){",
+    "reviewed": "function ownedRecognizer(rule){",
+    "candidateSha256": "824776de5d1d86d13aedd7a768328659f0ae30943a97942729a1dbf60aae185f"
+  },
+  {
+    "candidate": "i.contains.push(ownComment({scope:\"doctag\",",
+    "reviewed": "i.contains.push({scope:\"doctag\",",
+    "candidateSha256": "2815e73730ca04ad7f9c3067e2e20c62a1698dbd4701173c8a8a7a877c54bca4"
+  },
+  {
+    "candidate": "excludeBegin:!0,relevance:0},!1))",
+    "reviewed": "excludeBegin:!0,relevance:0})",
+    "candidateSha256": "933b329b0ac0ac212741f8e6383ecba969cda89ccc5056795daa990c16eba0c6"
+  },
+  {
+    "candidate": "return i.contains.push(ownComment({begin:b(/[ ]+/,\"(\",r,/[.]?[:]?([.][ ]|[ ])/,\"){3}\")},!0)),i",
+    "reviewed": "return i.contains.push({begin:b(/[ ]+/,\"(\",r,/[.]?[:]?([.][ ]|[ ])/,\"){3}\")}),i",
+    "candidateSha256": "f0b5674652e28b7ec3530ac9dcfe47a62c01c426d0fa2a2c04f91e32a2f55281"
+  },
+  {
+    "candidate": "compiledRecognizers.set(o,owned.select?{select:owned.select,selector:owned.selector,captures:owned.captures}:{span:owned.span})",
+    "reviewed": "compiledRecognizers.set(o,{span:owned.span})",
+    "candidateSha256": "c38b1d53f7398d20164851057a86e0ed225aaa8044179e3e28465195448816af"
+  },
+  {
+    "candidate": "compiledRecognizers.has(e)?(compiledRecognizers.get(e).selector||/[_A-Za-z]/):e.begin",
+    "reviewed": "compiledRecognizers.has(e)?/[_A-Za-z]/:e.begin",
+    "candidateSha256": "c23aa6338f266ae6a1b65c26dbee47e6cbee5e103909c0896f43801d339ee21b"
+  },
+  {
+    "candidate": "execOwned(input,match,offset,flags){\nflags=flags.replace(/[gy]/g,\"\");\n// Only a genuine owned rejection enters Unicode-safe local continuation.\nconst advance=at=>{const c=input.charCodeAt(at),d=input.charCodeAt(at+1);\nreturn at+(flags.includes(\"u\")&&c>=55296&&c<=56319&&d>=56320&&d<=57343?2:1)};\n// Rejected COMMENT selectors must not change the selecting matcher's relative rule position.\nlet commentOffset;\nwhile(match){\nconst owned=match.rule&&compiledRecognizers.get(match.rule);\nif(owned&&owned.select){\nif(commentOffset===undefined)commentOffset=offset-match.position-1;\nconst full=owned.select(input,match.index,flags);\n// Empty doctag begins are real matches; restore undefined captures too, before callbacks.\nif(full!==null){for(let i=0;i<=owned.captures;i++)match[i]=full[i];\nmatch.position=offset-commentOffset-1;this.regexIndex=offset;return match;}\n}else if(owned){const end=owned.span(input,match.index,flags);\n// Materialize the original full begin before the parser captures its lexeme; no mode lowering.\nif(end>match.index){match[0]=input.slice(match.index,end);this.regexIndex=offset;return match;}\n}else{\nif(commentOffset!==undefined)match.position=offset-commentOffset-1;\nthis.regexIndex=offset;return match;}\nlet cursor=match.index;\nfor(;;){\nconst matcher=this.getMatcher(offset);matcher.lastIndex=cursor;match=matcher.exec(input);\nif(matcher.matcherRe)flags=matcher.matcherRe.flags.replace(/[gy]/g,\"\");\nif(offset&&(!match||match.index!==cursor)||match&&match.index<cursor){\ncursor=advance(cursor);offset=0;commentOffset=undefined;if(cursor>input.length)return null;continue;\n}\nbreak;\n}\nif(match)offset+=match.position+1;\n}\nreturn null;\n",
+    "reviewed": "execOwned(input,match,offset,flags){\nflags=flags.replace(/[gy]/g,\"\");\n// Only a genuine owned rejection enters Unicode-safe local continuation.\nconst advance=at=>{const c=input.charCodeAt(at),d=input.charCodeAt(at+1);\nreturn at+(flags.includes(\"u\")&&c>=55296&&c<=56319&&d>=56320&&d<=57343?2:1)};\nwhile(match){\nconst owned=match.rule&&compiledRecognizers.get(match.rule);\nif(owned){const end=owned.span(input,match.index,flags);\n// Materialize the original full begin before the parser captures its lexeme; no mode lowering.\nif(end>match.index){match[0]=input.slice(match.index,end);this.regexIndex=offset;return match;}\n}else{this.regexIndex=offset;return match;}\nlet cursor=match.index;\nfor(;;){\nconst matcher=this.getMatcher(offset);matcher.lastIndex=cursor;match=matcher.exec(input);\nif(matcher.matcherRe)flags=matcher.matcherRe.flags.replace(/[gy]/g,\"\");\nif(offset&&(!match||match.index!==cursor)||match&&match.index<cursor){\ncursor=advance(cursor);offset=0;if(cursor>input.length)return null;continue;\n}\nbreak;\n}\nif(match)offset+=match.position+1;\n}\nreturn null;\n",
+    "candidateSha256": "f9a23baf8bd3f838db6eed3ef8284e27ec67ee758034b6cc92391432e0f6b106"
+  }
+]

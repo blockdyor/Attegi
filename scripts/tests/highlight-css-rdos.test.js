@@ -1,3 +1,4 @@
+import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
 import { beforeAll, test, expect } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -8,7 +9,7 @@ const source = readFileSync(new URL('../../src/js/libs/highlight.pack.js', impor
 const fixture = JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json', import.meta.url), 'utf8'));
 let baseline, before, after;
 beforeAll(() => {
-    baseline = source;
+    baseline = restoreComment(source);
     for (const { start, end, source: original } of fixture.originalFunctions) {
         const from = baseline.indexOf(start), to = baseline.indexOf(end, from);
         assert(from >= 0 && to > from, `Missing baseline boundary: ${start}`);

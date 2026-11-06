@@ -20,6 +20,40 @@ return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace
 function ownRecognizer(rule,span){
 ownedRecognizers.set(rule,{shape:Object.assign({},rule),span});return rule;
 }
+function ownComment(rule,phrase){
+const source=l(rule.begin),captures=phrase?3:1;
+const marker="(?:TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):";
+let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const next=new Uint8Array(input.length+1),native=RegExp(source,flags+"y");
+if(phrase){
+// One whole begin per maximal space run; three fixed word windows bound overlap.
+for(let i=0;i<input.length;){
+if(input.charCodeAt(i)!==32){i++;continue;}
+const start=i;while(i<input.length&&input.charCodeAt(i)===32)i++;
+native.lastIndex=start;if(native.exec(input)!==null)next.fill(1,start,i);
+}
+}else{
+const keyword=RegExp(marker,flags+"y");
+for(let i=input.length-1;i>=0;){
+if(input.charCodeAt(i)===32){i--;continue;}
+keyword.lastIndex=i;
+if(keyword.exec(input)!==null){
+next[i]=1;while(i>0&&input.charCodeAt(i-1)===32)next[--i]=1;
+}
+i--;
+}
+}
+// Only the latest input/actual matcher flags are retained; reentry may evict them.
+cachedInput=input;cachedFlags=flags;eligible=next;full=native;
+}
+if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+const selector=phrase?"[ ]()()()":"(?:[ ]|(?="+marker+"))()";
+ownedRecognizers.set(rule,{shape:Object.assign({},rule),select,selector,captures});return rule;
+}
 function ownedRecognizer(rule){
 const record=ownedRecognizers.get(rule);
 const proto=Object.getPrototypeOf(rule);
@@ -73,11 +107,11 @@ const f="[a-zA-Z]\\w*",E="[a-zA-Z_]\\w*",y="\\b\\d+(\\.\\d+)?",w="(-?)(\\b0[xX][
 begin:"\\\\[\\s\\S]",relevance:0},k={scope:"string",begin:"'",end:"'",
 illegal:"\\n",contains:[N]},x={scope:"string",begin:'"',end:'"',illegal:"\\n",
 contains:[N]},O=(e,n,t={})=>{const i=a({scope:"comment",begin:e,end:n,
-contains:[]},t);i.contains.push({scope:"doctag",
+contains:[]},t);i.contains.push(ownComment({scope:"doctag",
 begin:"[ ]*(?=(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):)",
-end:/(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):/,excludeBegin:!0,relevance:0})
+end:/(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):/,excludeBegin:!0,relevance:0},!1))
 ;const r=m("I","a","is","so","us","to","at","if","in","it","on",/[A-Za-z]+['](d|ve|re|ll|t|s|n)/,/[A-Za-z]+[-][a-z]+/,/[A-Za-z][a-z]{2,}/)
-;return i.contains.push({begin:b(/[ ]+/,"(",r,/[.]?[:]?([.][ ]|[ ])/,"){3}")}),i
+;return i.contains.push(ownComment({begin:b(/[ ]+/,"(",r,/[.]?[:]?([.][ ]|[ ])/,"){3}")},!0)),i
 },M=O("//","$"),A=O("/\\*","\\*/"),S=O("#","$");var C=Object.freeze({
 __proto__:null,APOS_STRING_MODE:k,BACKSLASH_ESCAPE:N,BINARY_NUMBER_MODE:{
 scope:"number",begin:v,relevance:0},BINARY_NUMBER_RE:v,COMMENT:O,
@@ -162,18 +196,28 @@ flags=flags.replace(/[gy]/g,"");
 // Only a genuine owned rejection enters Unicode-safe local continuation.
 const advance=at=>{const c=input.charCodeAt(at),d=input.charCodeAt(at+1);
 return at+(flags.includes("u")&&c>=55296&&c<=56319&&d>=56320&&d<=57343?2:1)};
+// Rejected COMMENT selectors must not change the selecting matcher's relative rule position.
+let commentOffset;
 while(match){
 const owned=match.rule&&compiledRecognizers.get(match.rule);
-if(owned){const end=owned.span(input,match.index,flags);
+if(owned&&owned.select){
+if(commentOffset===undefined)commentOffset=offset-match.position-1;
+const full=owned.select(input,match.index,flags);
+// Empty doctag begins are real matches; restore undefined captures too, before callbacks.
+if(full!==null){for(let i=0;i<=owned.captures;i++)match[i]=full[i];
+match.position=offset-commentOffset-1;this.regexIndex=offset;return match;}
+}else if(owned){const end=owned.span(input,match.index,flags);
 // Materialize the original full begin before the parser captures its lexeme; no mode lowering.
 if(end>match.index){match[0]=input.slice(match.index,end);this.regexIndex=offset;return match;}
-}else{this.regexIndex=offset;return match;}
+}else{
+if(commentOffset!==undefined)match.position=offset-commentOffset-1;
+this.regexIndex=offset;return match;}
 let cursor=match.index;
 for(;;){
 const matcher=this.getMatcher(offset);matcher.lastIndex=cursor;match=matcher.exec(input);
 if(matcher.matcherRe)flags=matcher.matcherRe.flags.replace(/[gy]/g,"");
 if(offset&&(!match||match.index!==cursor)||match&&match.index<cursor){
-cursor=advance(cursor);offset=0;if(cursor>input.length)return null;continue;
+cursor=advance(cursor);offset=0;commentOffset=undefined;if(cursor>input.length)return null;continue;
 }
 break;
 }
@@ -208,8 +252,8 @@ r.contains||(r.contains=[]),r.contains=[].concat(...r.contains.map(e=>(e=>(e.var
 variants:null},n))),e.cachedVariants?e.cachedVariants:Q(e)?a(e,{
 starts:e.starts?a(e.starts):null
 }):Object.isFrozen(e)?a(e):e))("self"===e?r:e))),r.contains.forEach(e=>{t(e,o)
-}),r.starts&&t(r.starts,s),owned&&compiledRecognizers.set(o,{span:owned.span}),o.matcher=(e=>{const n=new i
-;return e.contains.forEach(e=>n.addRule(compiledRecognizers.has(e)?/[_A-Za-z]/:e.begin,{rule:e,type:"begin"
+}),r.starts&&t(r.starts,s),owned&&compiledRecognizers.set(o,owned.select?{select:owned.select,selector:owned.selector,captures:owned.captures}:{span:owned.span}),o.matcher=(e=>{const n=new i
+;return e.contains.forEach(e=>n.addRule(compiledRecognizers.has(e)?(compiledRecognizers.get(e).selector||/[_A-Za-z]/):e.begin,{rule:e,type:"begin"
 })),e.terminatorEnd&&n.addRule(e.terminatorEnd,{type:"end"
 }),e.illegal&&n.addRule(e.illegal,{type:"illegal"}),n})(o),o}(e)}function Q(e){
 return!!e&&(e.endsWithParent||Q(e.starts))}class X extends Error{
