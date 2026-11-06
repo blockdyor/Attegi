@@ -911,11 +911,32 @@ className:"string"}),...includeAngleModes(true)
 ,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{className:"class",
 begin:"("+t.keyword.join("|")+")\\b",end:/(\{|$)/,excludeEnd:!0,keywords:t,
 contains:[e.UNDERSCORE_TITLE_MODE]},{begin:"\\."+e.UNDERSCORE_IDENT_RE,
-relevance:0}]}},grmr_perl:e=>{const n=e.regex,t=/[dualxmsipngr]{0,12}/,a={
+relevance:0}]}},grmr_perl:e=>{
+// Validate optional argument tails once, while the attr mode consumes the full accepted span.
+let attrInput,attrOpens;
+function attrArguments(match){
+const input=match.input;
+if(input!==attrInput){
+attrOpens=new Set;let closing=!1;
+for(let i=input.length-1;i>=0;i--){
+const ch=input[i];
+if(ch==="\n"||ch==="\r"||ch==="\u2028"||ch==="\u2029")closing=!1;
+else if(ch===")")closing=!0;
+else if(ch==="("&&closing)attrOpens.add(i);
+}
+}
+attrInput=input;
+const open=/\s*\(/y;open.lastIndex=match.index+match[0].length;
+return !!open.exec(input)&&attrOpens.has(open.lastIndex-1);
+}
+const n=e.regex,t=/[dualxmsipngr]{0,12}/,a={
 $pattern:/[\w.]+/,
 keyword:"abs accept alarm and atan2 bind binmode bless break caller chdir chmod chomp chop chown chr chroot class close closedir connect continue cos crypt dbmclose dbmopen defined delete die do dump each else elsif endgrent endhostent endnetent endprotoent endpwent endservent eof eval exec exists exit exp fcntl field fileno flock for foreach fork format formline getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname gethostent getlogin getnetbyaddr getnetbyname getnetent getpeername getpgrp getpriority getprotobyname getprotobynumber getprotoent getpwent getpwnam getpwuid getservbyname getservbyport getservent getsockname getsockopt given glob gmtime goto grep gt hex if index int ioctl join keys kill last lc lcfirst length link listen local localtime log lstat lt ma map method mkdir msgctl msgget msgrcv msgsnd my ne next no not oct open opendir or ord our pack package pipe pop pos print printf prototype push q|0 qq quotemeta qw qx rand read readdir readline readlink readpipe recv redo ref rename require reset return reverse rewinddir rindex rmdir say scalar seek seekdir select semctl semget semop send setgrent sethostent setnetent setpgrp setpriority setprotoent setpwent setservent setsockopt shift shmctl shmget shmread shmwrite shutdown sin sleep socket socketpair sort splice split sprintf sqrt srand stat state study sub substr symlink syscall sysopen sysread sysseek system syswrite tell telldir tie tied time times tr truncate uc ucfirst umask undef unless unlink unpack unshift untie until use utime values vec wait waitpid wantarray warn when while write x|0 xor y|0"
 },i={className:"subst",begin:"[$@]\\{",end:"\\}",keywords:a},r={begin:/->\{/,
-end:/\}/},s={scope:"attr",match:/\s+:\s*\w+(\s*\(.*?\))?/},o={scope:"variable",
+end:/\}/},s={scope:"attr",variants:[{
+begin:/\s+:\s*\w+/,end:/\)/,"on:begin":(match,response)=>{
+if(!attrArguments(match))response.ignoreMatch();
+}},{match:/\s+:\s*\w+/}]},o={scope:"variable",
 variants:[{begin:/\$\d/},{
 begin:n.concat(/[$%@](?!")(\^\w\b|#\w+(::\w+)*|\{\w+\}|\w+(::\w*)*)/,"(?![A-Za-z])(?![@$%])")
 },{begin:/[$%@](?!")[^\s\w{=]|\$=/,relevance:0}],contains:[s]},c={
@@ -944,9 +965,13 @@ className:"regexp",variants:[{begin:/(m|qr)\/\//,relevance:0},{
 begin:u("(?:m|qr)?",/\//,/\//)},{begin:u("m|qr",n.either(...d,{capture:!0
 }),/\1/)},{begin:u("m|qr",/\(/,/\)/)},{begin:u("m|qr",/\[/,/\]/)},{
 begin:u("m|qr",/\{/,/\}/)}]}]},{className:"function",beginKeywords:"sub method",
-end:"(\\s*\\(.*?\\))?[;{]",excludeEnd:!0,relevance:5,contains:[e.TITLE_MODE,s]
+end:"(\\s*\\(.*?\\))?[;{]",excludeEnd:!0,relevance:5,contains:[e.TITLE_MODE,s,
+// End wins before the whitespace fallback, with the entire original excluded lexeme.
+{begin:/(\s*\(.*?\))?[;{]/,returnBegin:!0,end:/(\s*\(.*?\))?[;{]/,
+excludeEnd:!0,endsParent:!0,relevance:0},{match:/\s+/,skip:!0,relevance:0}]
 },{className:"class",beginKeywords:"class",end:"[;{]",excludeEnd:!0,relevance:5,
-contains:[e.TITLE_MODE,s,c]},{begin:"-\\w\\b",relevance:0},{begin:"^__DATA__$",
+contains:[e.TITLE_MODE,s,c,{begin:/[;{]/,returnBegin:!0,end:/[;{]/,
+excludeEnd:!0,endsParent:!0,relevance:0},{match:/\s+/,skip:!0,relevance:0}]},{begin:"-\\w\\b",relevance:0},{begin:"^__DATA__$",
 end:"^__END__$",subLanguage:"mojolicious",contains:[{begin:"^@@.*",end:"$",
 className:"comment"}]}];return i.contains=b,r.contains=b,{name:"Perl",
 aliases:["pl","pm"],keywords:a,contains:b}},grmr_php:e=>{
@@ -1081,6 +1106,17 @@ match:[/%[^%]*%/,a]},{scope:{1:"punctuation",2:"number"},match:[r,a]},{scope:{
 match:[t,/\s+/,/<-/,/\s+/]},{scope:"operator",relevance:0,variants:[{match:i},{
 match:/%[^%]*%/}]},{scope:"punctuation",relevance:0,match:r},{begin:"`",end:"`",
 contains:[{begin:/\\./}]}]}},grmr_ruby:e=>{
+// Retain one input only; eligibility depends on the last matching line, not a suffix scan per opener.
+let heredocInput,heredocEnds;
+function heredocAllowed(input,index){
+if(input!==heredocInput){
+heredocEnds=new Map;const line=/\n[^\S\n]*(\w+)\b/g;let match;
+while((match=line.exec(input)))heredocEnds.set(match[1],match.index);
+}
+heredocInput=input;
+const word=/\w+(?=\W)/y;word.lastIndex=index;const match=word.exec(input);
+return !!match&&heredocEnds.get(match[0])>=word.lastIndex;
+}
 const n=e.regex,t="([a-zA-Z_]\\w*[!?=]?|[-+~]@|<<|>>|=~|===?|<=>|[<>]=?|\\*\\*|[-/+%^&*~`|]|\\[\\]=?)",a=n.either(/\b([A-Z]+[a-z0-9]+)+/,/\b([A-Z]+[a-z0-9]+)+[A-Z]+/),i=n.concat(a,/(::\w+)*/),r={
 "variable.constant":["__FILE__","__LINE__","__ENCODING__"],
 "variable.language":["self","super"],
@@ -1099,7 +1135,9 @@ begin:/%[qQwWx]?\|/,end:/\|/},{begin:/\B\?(\\\d{1,3})/},{
 begin:/\B\?(\\x[A-Fa-f0-9]{1,2})/},{begin:/\B\?(\\u\{?[A-Fa-f0-9]{1,6}\}?)/},{
 begin:/\B\?(\\M-\\C-|\\M-\\c|\\c\\M-|\\M-|\\C-\\M-)[\x20-\x7e]/},{
 begin:/\B\?\\(c|C-)[\x20-\x7e]/},{begin:/\B\?\\?\S/},{
-begin:n.concat(/<<[-~]?'?/,n.lookahead(/(\w+)(?=\W)[^\n]*\n(?:[^\n]*\n)*?\s*\1\b/)),
+begin:/<<[-~]?'?/,"on:begin":(match,response)=>{
+if(!heredocAllowed(match.input,match.index+match[0].length))response.ignoreMatch();
+},
 contains:[e.END_SAME_AS_BEGIN({begin:/(\w+)/,end:/(\w+)/,
 contains:[e.BACKSLASH_ESCAPE,l]})]}]},g="[0-9](_?[0-9])*",u={className:"number",
 relevance:0,variants:[{
@@ -1178,10 +1216,15 @@ begin:"@",end:"[{;]",returnBegin:!0,keywords:{$pattern:/[a-z-]+/,
 keyword:"and or not only",attribute:Re.join(" ")},contains:[{begin:i,
 className:"keyword"},{variants:[{begin:/[a-z-]/,end:/(?=[^a-z-]|$)/,"on:begin":cssIdentifier(":"),className:"attribute"},{begin:/[a-z-]/,skip:!0}]
 },r,e.QUOTE_STRING_MODE,e.APOS_STRING_MODE,n.HEXCOLOR,n.CSS_NUMBER_MODE]
-},n.FUNCTION_DISPATCH]}},grmr_shell:e=>({name:"Shell Session",
+},n.FUNCTION_DISPATCH]}},grmr_shell:e=>{const n=/[\r\n\u2028\u2029]/,t=/\s/;let a,i;
+return{name:"Shell Session",
 aliases:["console","shellsession"],contains:[{className:"meta.prompt",
-begin:/^\s{0,3}[./~\w\d[\]()@-]*[>%$#][ ]?/,starts:{end:/[^\\](?=\s*$)/,
-subLanguage:"bash"}}]}),grmr_sql:e=>{
+begin:/^\s{0,3}[./~\w\d[\]()@-]*[>%$#][ ]?/,starts:{end:/[^\\]/,
+"on:end":(e,r)=>{
+// Index whitespace-to-line-end once without extending the emitted Bash span.
+if(a!==e.input){a=e.input;i=new Uint8Array(a.length+1);i[a.length]=1;
+for(let e=a.length-1;e>=0;e--)i[e]=n.test(a[e])||t.test(a[e])&&i[e+1]?1:0;}
+a=e.input;i[e.index+1]||r.ignoreMatch();},subLanguage:"bash"}}]};},grmr_sql:e=>{
 const n=e.regex,t=e.COMMENT("--","$"),a=["abs","acos","array_agg","asin","atan","avg","cast","ceil","ceiling","coalesce","corr","cos","cosh","count","covar_pop","covar_samp","cume_dist","dense_rank","deref","element","exp","extract","first_value","floor","json_array","json_arrayagg","json_exists","json_object","json_objectagg","json_query","json_table","json_table_primitive","json_value","lag","last_value","lead","listagg","ln","log","log10","lower","max","min","mod","nth_value","ntile","nullif","percent_rank","percentile_cont","percentile_disc","position","position_regex","power","rank","regr_avgx","regr_avgy","regr_count","regr_intercept","regr_r2","regr_slope","regr_sxx","regr_sxy","regr_syy","row_number","sin","sinh","sqrt","stddev_pop","stddev_samp","substring","substring_regex","sum","tan","tanh","translate","translate_regex","treat","trim","trim_array","unnest","upper","value_of","var_pop","var_samp","width_bucket"],i=a,r=["abs","acos","all","allocate","alter","and","any","are","array","array_agg","array_max_cardinality","as","asensitive","asin","asymmetric","at","atan","atomic","authorization","avg","begin","begin_frame","begin_partition","between","bigint","binary","blob","boolean","both","by","call","called","cardinality","cascaded","case","cast","ceil","ceiling","char","char_length","character","character_length","check","classifier","clob","close","coalesce","collate","collect","column","commit","condition","connect","constraint","contains","convert","copy","corr","corresponding","cos","cosh","count","covar_pop","covar_samp","create","cross","cube","cume_dist","current","current_catalog","current_date","current_default_transform_group","current_path","current_role","current_row","current_schema","current_time","current_timestamp","current_path","current_role","current_transform_group_for_type","current_user","cursor","cycle","date","day","deallocate","dec","decimal","decfloat","declare","default","define","delete","dense_rank","deref","describe","deterministic","disconnect","distinct","double","drop","dynamic","each","element","else","empty","end","end_frame","end_partition","end-exec","equals","escape","every","except","exec","execute","exists","exp","external","extract","false","fetch","filter","first_value","float","floor","for","foreign","frame_row","free","from","full","function","fusion","get","global","grant","group","grouping","groups","having","hold","hour","identity","in","indicator","initial","inner","inout","insensitive","insert","int","integer","intersect","intersection","interval","into","is","join","json_array","json_arrayagg","json_exists","json_object","json_objectagg","json_query","json_table","json_table_primitive","json_value","lag","language","large","last_value","lateral","lead","leading","left","like","like_regex","listagg","ln","local","localtime","localtimestamp","log","log10","lower","match","match_number","match_recognize","matches","max","member","merge","method","min","minute","mod","modifies","module","month","multiset","national","natural","nchar","nclob","new","no","none","normalize","not","nth_value","ntile","null","nullif","numeric","octet_length","occurrences_regex","of","offset","old","omit","on","one","only","open","or","order","out","outer","over","overlaps","overlay","parameter","partition","pattern","per","percent","percent_rank","percentile_cont","percentile_disc","period","portion","position","position_regex","power","precedes","precision","prepare","primary","procedure","ptf","range","rank","reads","real","recursive","ref","references","referencing","regr_avgx","regr_avgy","regr_count","regr_intercept","regr_r2","regr_slope","regr_sxx","regr_sxy","regr_syy","release","result","return","returns","revoke","right","rollback","rollup","row","row_number","rows","running","savepoint","scope","scroll","search","second","seek","select","sensitive","session_user","set","show","similar","sin","sinh","skip","smallint","some","specific","specifictype","sql","sqlexception","sqlstate","sqlwarning","sqrt","start","static","stddev_pop","stddev_samp","submultiset","subset","substring","substring_regex","succeeds","sum","symmetric","system","system_time","system_user","table","tablesample","tan","tanh","then","time","timestamp","timezone_hour","timezone_minute","to","trailing","translate","translate_regex","translation","treat","trigger","trim","trim_array","true","truncate","uescape","union","unique","unknown","unnest","update","upper","user","using","value","values","value_of","var_pop","var_samp","varbinary","varchar","varying","versioning","when","whenever","where","width_bucket","window","with","within","without","year","add","asc","collation","desc","final","first","last","view"].filter(e=>!a.includes(e)),s={
 match:n.concat(/\b/,n.either(...i),/\s*\(/),relevance:0,keywords:{built_in:i}}
 ;function o(e){

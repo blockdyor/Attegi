@@ -52,6 +52,9 @@ All issue IDs share prefix `AaGqubYQiPLUZgo8aW`.
 | 2c | S8786 | 558:4–558:14 | C# function end: consume a whole whitespace run plus optional delimiter; cached rejection retains failed runs. |
 | 2r | S8786 | 849:41–849:56 | PHP heredoc: remove failed indentation-prefix retries before delimiter words. |
 | 2s | S8786 | 853:31–853:46 | PHP nowdoc: same maximal-word end matching, original delimiter capture preserved. |
+| 2p | S8786 | 809:32–809:57 | Perl ATTR: indexed optional arguments, original-prefix fallback and failed declaration-whitespace consumption. |
+| 2u | S8786 | 993:39–993:81 | Ruby heredoc: cached last matching delimiter line replaces repeated suffix lookaheads. |
+| 2y | S8786 | 1074:56–1074:71 | Shell: indexed multiline whitespace eligibility preserves the original one-character end span. |
 
 Every comparator is `(a,b)=>a<b?-1:a>b?1:0`, not locale-dependent
 `localeCompare`. Existing `.reverse()` calls and exact array order are retained.
@@ -111,7 +114,30 @@ not complete internal callback-event identity. The theme uses `highlightElement`
 and does not wrap these callbacks. PHP class-name path2q remains unrepaired.
 Both focused packets reconstruct the exact original before executing either VM.
 
+Shell end eligibility uses a one-input byte index matching multiline JavaScript
+whitespace/end-of-line semantics. Accepted ends still consume one UTF-16 code
+unit and preserve the Bash buffer. The new `on:end` hook and O(input length)
+cache are observable; reentry may rebuild the cache. Neither arbitrary modified
+Shell grammars nor unrelated Bash paths receive a universal linearity guarantee.
+Java Javadoc (2h) and Java method (2i) remain unchanged and unrepaired.
+
 ## Regression evidence and repeat commands
+
+Perl attribute eligibility indexes closing parentheses within the original dot
+boundaries. Accepted arguments consume the whole original span; same-position
+prefix and buffered skip-mode whitespace fallbacks retain declaration ends and
+raw emitter chunks. Ruby indexes the last
+matching delimiter line and checks each opener against its original word/header
+constraints. Both retain one input; fresh equal references are rebound. Reentry
+can evict and rebuild these indexes, so their bounds do not cover arbitrary
+repeated custom-emitter reentry or unrelated Perl declaration ends/Ruby prompts.
+
+These changes preserve tested rendered results, captures used by stock parsing,
+relevance, illegality and rankings, not every internal event: Perl begin callbacks
+see the argument-free prefix, Ruby loses the lookahead capture, and declaration
+bridging changes matcher events. `highlight-perl-ruby-rdos.test.js` checks actual
+compiled callers, original-byte integrity before either VM, failed/later valid
+candidates, complete accepted spans, one-time normal-emitter reentry and work.
 
 `../../../scripts/tests/highlight-vendor-quality.test.js` exercises the actual
 bundled API and all 36 registrations. It compares HTML, relevance, illegal status,
