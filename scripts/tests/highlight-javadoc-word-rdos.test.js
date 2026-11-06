@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { undoOwnership } from './fixtures/highlight-metadata-oracle.cjs';
 const source=readFileSync(new URL('../../src/js/libs/highlight.pack.js',import.meta.url),'utf8');
 const fixture=JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json',import.meta.url),'utf8'));
 const hash=s=>createHash('sha256').update(s).digest('hex');
@@ -13,7 +14,7 @@ function undo(text,row){const lo=text.indexOf(row.start),hi=text.indexOf(row.end
 beforeAll(()=>{
  // Authenticate the exact parent AND original upstream before executing vendor code.
  base=source;const java=fixture.originalFunctions.find(x=>x.start===start);if(java)base=undo(base,java);
- assert.equal(hash(base),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
+ assert.equal(hash(undoOwnership(base)),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
  let original=source;for(const row of fixture.originalFunctions)original=undo(original,row);
  original=original.replaceAll('.sort((a,b)=>a<b?-1:a>b?1:0).reverse()', '.sort().reverse()')
  .replace('grmr_wasm:e=>{const','grmr_wasm:e=>{e.regex;const')

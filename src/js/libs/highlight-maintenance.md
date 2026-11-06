@@ -121,6 +121,39 @@ cache are observable; reentry may rebuild the cache. Neither arbitrary modified
 Shell grammars nor unrelated Bash paths receive a universal linearity guarantee.
 Java Javadoc (2h) and Java method (2i) remain unchanged and unrepaired.
 
+## Native matcher metadata ownership
+
+Each full or resumed `MultiRegex` now shallow-copies its ordinary rule metadata
+before assigning its local `position`. Cached suffix construction must not
+rewrite the full matcher's ordinal. Compiled mode pointers, callbacks and
+`response.data` retain their identities; no per-character scan or cache layer is
+added. The exact-index sticky guard, fallback offset reset, rejected-last-begin
+end/illegal alternatives and end-span handling remain unchanged.
+
+The public ignored-`a`, COMMENT word guard, ignored-`x` grammar on `a x` calls
+`x` once in the authenticated original, twice in the reviewed parent, and once
+after this repair. Safe/debug exceptions on a second call are tested. The same
+latent ownership defect can also duplicate a callback in the original after
+cache reuse (`a x` followed by ` x`); a one-line ownership-only original
+counterfactual proves that cause. Cache-order tests require fresh-original
+callback flow and cumulative shared data, not preservation of stale-cache bugs.
+
+`highlight-metadata-ownership.test.js` covers that regression, full/suffix cache
+orders, actual compiled mode/data identity, captures, lexical mutations,
+continuation, bounded callback/emitter reentry, and default raw IR/nonempty chunks
+for all 36 languages and 71 aliases. Known earlier rejected-EOF and SCSS illegal
+index corrections remain individually pinned, not blanket callback exceptions.
+The small `fixtures/highlight-metadata-oracle.cjs` authenticates the exact parent
+by undoing only this delta and reconstructs the original with the unchanged 27
+inverse objects. Existing historical hash checks undo ownership only for hash
+authentication; Java and sticky comparisons still execute distinct candidates
+with the same repaired core. The standalone checks also run with Node:
+
+```sh
+node scripts/tests/fixtures/highlight-metadata-checks.cjs
+bun test scripts/tests/highlight-metadata-ownership.test.js
+```
+
 ## Regression evidence and repeat commands
 
 Perl attribute eligibility indexes closing parentheses within the original dot

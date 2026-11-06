@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { undoOwnership } from './fixtures/highlight-metadata-oracle.cjs';
 const source=readFileSync(new URL('../../src/js/libs/highlight.pack.js',import.meta.url),'utf8');
 const fixture=JSON.parse(readFileSync(new URL('highlight-vendor-baseline.json',import.meta.url),'utf8'));
 const old='n.compile(),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){';
@@ -14,9 +15,9 @@ beforeAll(()=>{
     const lo=source.indexOf(java.start),hi=source.indexOf(java.end,lo);
     assert(lo>=0&&hi>lo);
     const coreParent=source.slice(0,lo)+java.source+source.slice(hi);
-    assert.equal(createHash('sha256').update(coreParent).digest('hex'),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
+    assert.equal(createHash('sha256').update(undoOwnership(coreParent)).digest('hex'),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
     base=coreParent.replace(fixed,old);
-    assert.equal(createHash('sha256').update(base).digest('hex'),'403710522aeafacee7eb3fd3978d66ea5408ec2795eec816ec6ae3d62f501975');
+    assert.equal(createHash('sha256').update(undoOwnership(base)).digest('hex'),'403710522aeafacee7eb3fd3978d66ea5408ec2795eec816ec6ae3d62f501975');
     let original=source;
     for(const row of fixture.originalFunctions) {
         const lo=original.indexOf(row.start),hi=original.indexOf(row.end,lo);

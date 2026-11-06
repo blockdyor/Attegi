@@ -130,7 +130,7 @@ return RegExp(l(n),"m"+(e.case_insensitive?"i":"")+(e.unicodeRegex?"u":"")+(t?"g
 }class t{constructor(){
 this.matchIndexes={},this.regexes=[],this.matchAt=1,this.position=0}
 addRule(e,n){
-n.position=this.position++,this.matchIndexes[this.matchAt]=n,this.regexes.push([n,e]),
+n=Object.assign({},n,{position:this.position++}),this.matchIndexes[this.matchAt]=n,this.regexes.push([n,e]),
 this.matchAt+=p(e)+1}compile(){0===this.regexes.length&&(this.exec=()=>null)
 ;const e=this.regexes.map(e=>e[1]);this.matcherRe=n(h(e,{joinWith:"|"
 }),!0),this.lastIndex=0}exec(e){this.matcherRe.lastIndex=this.lastIndex
