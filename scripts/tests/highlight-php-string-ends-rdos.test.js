@@ -42,7 +42,7 @@ for (const [id, begin] of [['2r', starts[0]], ['2s', starts[2]]]) {
     test(`AaGqubYQiPLUZgo8aW${id}: compiled end does not restart on indentation`, () => {
         const r = after.highlight(begin + ' '.repeat(128) + '!', { language: 'php' });
         expect(r.errorRaised).toBeUndefined();
-        expect(r._top.endRe.source).toBe('(\\w+)\\b');
+        expect(r._top.endRe.source).toBe('(\\w+)');
     });
 }
 
@@ -169,7 +169,7 @@ test('bounded native matcher invocations inspect the actual compiled end alterna
             expect(calls).toHaveLength(1);
             expect(calls[0].matched).toBe(false);
             const end = top.matcher.rules.at(-1)[0];
-            expect(end).toBe(label === 'original' ? '[ \\t]*(\\w+)\\b' : '(\\w+)\\b');
+            expect(end).toBe(label === 'original' ? '[ \\t]*(\\w+)\\b' : '(\\w+)');
             rows.push({ id, n, label, end, matcher: regex.source, calls });
         }
     }
@@ -198,8 +198,8 @@ test('bounded whitespace witnesses preserve complete output with actual compiled
         expect(result(after, code)).toEqual(result(before, code));
         const r = after.highlight(code, { language: 'php' });
         // This actual compiled terminator has no whitespace alternative or prefix.
-        expect(r._top.endRe.source).toBe('(\\w+)\\b');
-        expect(r._top.terminatorEnd).toBe('(\\w+)\\b');
+        expect(r._top.endRe.source).toBe('(\\w+)');
+        expect(r._top.terminatorEnd).toBe('(\\w+)');
         rows.push({ id, n, end: r._top.endRe.source, terminatorEnd: r._top.terminatorEnd });
     }
     console.log('PHP_STRING_ENDS_STRUCTURE=' + JSON.stringify(rows));

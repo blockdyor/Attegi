@@ -955,11 +955,11 @@ scope:"variable",match:"\\$+"+a},o={scope:"subst",variants:[{begin:/\$\w+/},{
 begin:/\{\$/,end:/\}/}]},c=e.inherit(e.APOS_STRING_MODE,{illegal:null
 }),l="[ \t\n]",d={scope:"string",variants:[e.inherit(e.QUOTE_STRING_MODE,{
 illegal:null,contains:e.QUOTE_STRING_MODE.contains.concat(o)}),c,{
-begin:/<<<[ \t]*(?:(\w+)|"(\w+)")\n/,end:/(\w+)\b/,
+begin:/<<<[ \t]*(?:(\w+)|"(\w+)")\n/,end:/(\w+)/,
 contains:e.QUOTE_STRING_MODE.contains.concat(o),"on:begin":(e,n)=>{
 n.data._beginMatch=e[1]||e[2]},"on:end":(e,n)=>{
 n.data._beginMatch!==e[1]&&n.ignoreMatch()}},e.END_SAME_AS_BEGIN({
-begin:/<<<[ \t]*'(\w+)'\n/,end:/(\w+)\b/})]},g={scope:"number",variants:[{
+begin:/<<<[ \t]*'(\w+)'\n/,end:/(\w+)/})]},g={scope:"number",variants:[{
 begin:"\\b0[bB][01]+(?:_[01]+)*\\b"},{begin:"\\b0[oO][0-7]+(?:_[0-7]+)*\\b"},{
 begin:"\\b0[xX][\\da-fA-F]+(?:_[\\da-fA-F]+)*\\b"},{
 begin:"(?:\\b\\d+(?:_\\d+)*(\\.(?:\\d+(?:_\\d+)*))?|\\B\\.\\d+)(?:[eE][+-]?\\d+)?"

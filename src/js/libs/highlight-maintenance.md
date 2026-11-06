@@ -102,8 +102,9 @@ no shared activation-specific closing pointer is used. An unchanged root
 attribute scan can still be nonlinear after a delimiter; this is not original2a
 and is not claimed fixed.
 
-PHP heredoc/nowdoc endings drop only the optional horizontal-whitespace
-prefix. Result HTML/relevance/captures and tested parent/emitter behavior agree;
+PHP heredoc/nowdoc endings drop the optional horizontal-whitespace prefix
+and redundant word boundary after a greedy maximal-word capture. Result
+HTML/relevance/captures and tested parent/emitter behavior agree;
 consumers wrapping internal `on:end` callbacks through `getLanguage` observe
 changed raw `match[0]`/`match.index` spans (indentation is now body text). This is
 not complete internal callback-event identity. The theme uses `highlightElement`
