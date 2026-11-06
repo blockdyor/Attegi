@@ -388,13 +388,25 @@ className:"title.function"})]},{match:/\.\.\./,relevance:0},k,{match:"\\$"+t,
 relevance:0},{match:[/\bconstructor(?=\s*\()/],className:{1:"title.function"},
 contains:[f]},v,{relevance:0,match:/\b[A-Z][A-Z_0-9]+\b/,
 className:"variable.constant"},E,x,{match:/\$[(.]/}]}}
+function cssIdentifier(suffix){return(e,n)=>{
+// Ignored single-character starts share one identifier scan, not repeated suffix scans.
+const t=n.data;if(t.input!==e.input||e.index<t.start||e.index>=t.end){
+const n=suffix===":"?/[a-z-]+/gi:/[\w-]+/g;n.lastIndex=e.index;const a=n.exec(e.input);
+t.start=e.index;t.end=e.index+a[0].length;
+t.accept=suffix===":"?e.input[t.end]===suffix:suffix(e.input,t.end)}
+t.input=e.input;
+if(!t.accept)n.ignoreMatch()}}
 const ue=e=>b(/\b/,e,/\w$/.test(e)?/\b/:/\B/),be=["Protocol","Type"].map(ue),me=["init","self"].map(ue),pe=["Any","Self"],_e=["actor","any","associatedtype","async","await",/as\?/,/as!/,"as","borrowing","break","case","catch","class","consume","consuming","continue","convenience","copy","default","defer","deinit","didSet","distributed","do","dynamic","each","else","enum","extension","fallthrough",/fileprivate\(set\)/,"fileprivate","final","for","func","get","guard","if","import","indirect","infix",/init\?/,/init!/,"inout",/internal\(set\)/,"internal","in","is","isolated","nonisolated","lazy","let","macro","mutating","nonmutating",/open\(set\)/,"open","operator","optional","override","package","postfix","precedencegroup","prefix",/private\(set\)/,"private","protocol",/public\(set\)/,"public","repeat","required","rethrows","return","set","some","static","struct","subscript","super","switch","throws","throw",/try\?/,/try!/,"try","typealias",/unowned\(safe\)/,/unowned\(unsafe\)/,"unowned","var","weak","where","while","willSet"],he=["false","nil","true"],fe=["assignment","associativity","higherThan","left","lowerThan","none","right"],Ee=["#colorLiteral","#column","#dsohandle","#else","#elseif","#endif","#error","#file","#fileID","#fileLiteral","#filePath","#function","#if","#imageLiteral","#keyPath","#line","#selector","#sourceLocation","#warning"],ye=["abs","all","any","assert","assertionFailure","debugPrint","dump","fatalError","getVaList","isKnownUniquelyReferenced","max","min","numericCast","pointwiseMax","pointwiseMin","precondition","preconditionFailure","print","readLine","repeatElement","sequence","stride","swap","swift_unboxFromSwiftValueWithType","transcode","type","unsafeBitCast","unsafeDowncast","withExtendedLifetime","withUnsafeMutablePointer","withUnsafePointer","withVaList","withoutActuallyEscaping","zip"],we=m(/[/=\-+!*%<>&|^~?]/,/[\u00A1-\u00A7]/,/[\u00A9\u00AB]/,/[\u00AC\u00AE]/,/[\u00B0\u00B1]/,/[\u00B6\u00BB\u00BF\u00D7\u00F7]/,/[\u2016-\u2017]/,/[\u2020-\u2027]/,/[\u2030-\u203E]/,/[\u2041-\u2053]/,/[\u2055-\u205E]/,/[\u2190-\u23FF]/,/[\u2500-\u2775]/,/[\u2794-\u2BFF]/,/[\u2E00-\u2E7F]/,/[\u3001-\u3003]/,/[\u3008-\u3020]/,/[\u3030]/),ve=m(we,/[\u0300-\u036F]/,/[\u1DC0-\u1DFF]/,/[\u20D0-\u20FF]/,/[\uFE00-\uFE0F]/,/[\uFE20-\uFE2F]/),Ne=b(we,ve,"*"),ke=m(/[a-zA-Z_]/,/[\u00A8\u00AA\u00AD\u00AF\u00B2-\u00B5\u00B7-\u00BA]/,/[\u00BC-\u00BE\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]/,/[\u0100-\u02FF\u0370-\u167F\u1681-\u180D\u180F-\u1DBF]/,/[\u1E00-\u1FFF]/,/[\u200B-\u200D\u202A-\u202E\u203F-\u2040\u2054\u2060-\u206F]/,/[\u2070-\u20CF\u2100-\u218F\u2460-\u24FF\u2776-\u2793]/,/[\u2C00-\u2DFF\u2E80-\u2FFF]/,/[\u3004-\u3007\u3021-\u302F\u3031-\u303F\u3040-\uD7FF]/,/[\uF900-\uFD3D\uFD40-\uFDCF\uFDF0-\uFE1F\uFE30-\uFE44]/,/[\uFE47-\uFEFE\uFF00-\uFFFD]/),xe=m(ke,/\d/,/[\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]/),Oe=b(ke,xe,"*"),Me=b(/[A-Z]/,xe,"*"),Ae=["attached","autoclosure",b(/convention\(/,m("swift","block","c"),/\)/),"discardableResult","dynamicCallable","dynamicMemberLookup","escaping","freestanding","frozen","GKInspectable","IBAction","IBDesignable","IBInspectable","IBOutlet","IBSegueAction","inlinable","main","nonobjc","NSApplicationMain","NSCopying","NSManaged",b(/objc\(/,Oe,/\)/),"objc","objcMembers","propertyWrapper","requires_stored_property_inits","resultBuilder","Sendable","testable","UIApplicationMain","unchecked","unknown","usableFromInline","warn_unqualified_access"],Se=["iOS","iOSApplicationExtension","macOS","macOSApplicationExtension","macCatalyst","macCatalystApplicationExtension","watchOS","watchOSApplicationExtension","tvOS","tvOSApplicationExtension","swift"],Ce=e=>({
 IMPORTANT:{scope:"meta",begin:"!important"},
 BLOCK_COMMENT:e.C_BLOCK_COMMENT_MODE,HEXCOLOR:{scope:"number",
 begin:/#(([0-9a-fA-F]{3,4})|(([0-9a-fA-F]{2}){3,4}))\b/},UNICODE_RANGE:{
 scope:"number",
 begin:/\b[Uu]\+[0-9A-Fa-f][0-9A-Fa-f?]{0,5}(-[0-9A-Fa-f][0-9A-Fa-f]{0,5})?/},
-FUNCTION_DISPATCH:{className:"built_in",begin:/[\w-]+(?=\()/},
+FUNCTION_DISPATCH:{variants:[{
+className:"built_in",begin:/[\w-]/,end:/(?=[^\w-]|$)/,
+"on:begin":cssIdentifier((e,n)=>e[n]==="(")},
+// Accept failed starts without flushing the parent's keyword buffer or retry state.
+{begin:/[\w-]/,skip:!0}]},
 ATTRIBUTE_SELECTOR_MODE:{scope:"selector-attr",begin:/\[/,end:/\]/,illegal:"$",
 contains:[e.APOS_STRING_MODE,e.QUOTE_STRING_MODE]},CSS_NUMBER_MODE:{
 scope:"number",
@@ -582,7 +594,7 @@ excludeEnd:!0}]},t.FUNCTION_DISPATCH]},{begin:n.lookahead(/@/),end:"[{;]",
 relevance:0,illegal:/:/,contains:[{className:"keyword",begin:/@-?\w[\w]*(-\w+)*/
 },{begin:/\s/,endsWithParent:!0,excludeEnd:!0,relevance:0,keywords:{
 $pattern:/[a-z-]+/,keyword:"and or not only",attribute:Re.join(" ")},contains:[{
-begin:/[a-z-]+(?=:)/,className:"attribute"},...a,t.CSS_NUMBER_MODE]}]},{
+variants:[{begin:/[a-z-]/,end:/(?=[^a-z-]|$)/,"on:begin":cssIdentifier(":"),className:"attribute"},{begin:/[a-z-]/,skip:!0}]},...a,t.CSS_NUMBER_MODE]}]},{
 className:"selector-tag",begin:"\\b("+Te.join("|")+")\\b"}]}},grmr_diff:e=>{
 const n=e.regex;return{name:"Diff",aliases:["patch"],contains:[{
 className:"meta",relevance:10,
@@ -709,7 +721,9 @@ relevance:0}
 begin:"(url|data-uri)\\(",starts:{className:"string",end:"[\\)\\n]",
 excludeEnd:!0}
 },n.UNICODE_RANGE,n.HEXCOLOR,d,c("variable","@@?"+a,10),c("variable","@\\{"+a+"\\}"),c("built_in","~?`[^`]*?`"),{
-className:"attribute",begin:a+"\\s*:",end:":",returnBegin:!0,excludeEnd:!0
+className:"attribute",begin:/[\w-]/,"on:begin":cssIdentifier((e,n)=>{
+while(/\s/.test(e[n]))n++;return e[n]===":"}),
+end:":",returnBegin:!0,excludeEnd:!0
 },n.IMPORTANT,{beginKeywords:"and not"},n.FUNCTION_DISPATCH);const g=s.concat({
 begin:/\{/,end:/\}/,contains:r}),u={beginKeywords:"when",endsWithParent:!0,
 contains:[{beginKeywords:"and not"}].concat(s)},b={begin:i+"\\s*:",
@@ -1108,7 +1122,7 @@ contains:[n.BLOCK_COMMENT,r,n.HEXCOLOR,n.CSS_NUMBER_MODE,n.UNICODE_RANGE,e.QUOTE
 },{begin:"@(page|font-face)",keywords:{$pattern:i,keyword:"@page @font-face"}},{
 begin:"@",end:"[{;]",returnBegin:!0,keywords:{$pattern:/[a-z-]+/,
 keyword:"and or not only",attribute:Re.join(" ")},contains:[{begin:i,
-className:"keyword"},{begin:/[a-z-]+(?=:)/,className:"attribute"
+className:"keyword"},{variants:[{begin:/[a-z-]/,end:/(?=[^a-z-]|$)/,"on:begin":cssIdentifier(":"),className:"attribute"},{begin:/[a-z-]/,skip:!0}]
 },r,e.QUOTE_STRING_MODE,e.APOS_STRING_MODE,n.HEXCOLOR,n.CSS_NUMBER_MODE]
 },n.FUNCTION_DISPATCH]}},grmr_shell:e=>({name:"Shell Session",
 aliases:["console","shellsession"],contains:[{className:"meta.prompt",
