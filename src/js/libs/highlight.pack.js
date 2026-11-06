@@ -755,13 +755,49 @@ name:"Makefile",aliases:["mk","mak","make"],keywords:{$pattern:/[\w-]+/,
 keyword:"define endef undefine ifdef ifndef ifeq ifneq else endif include -include sinclude override export unexport private vpath"
 },contains:[e.HASH_COMMENT_MODE,n,t,a,i,{className:"meta",begin:/^\.PHONY:/,
 end:/$/,keywords:{$pattern:/[\.\w]+/,keyword:".PHONY"}},r]}},grmr_markdown:e=>{
+// Index the original five lookaheads once, without narrowing their permissive labels.
+let linkInput,linkMasks;
+function indexLinks(input){
+linkInput=input;linkMasks=new Uint8Array(input.length);
+let bracket=-1,paren=-1;
+const next=[-1,-1,-1,-1,-1],second=next.slice(),
+popular=/(?:(?:data|javascript|mailto):|(?:http|ftp)s?:\/\/)/y,
+scheme=/[A-Za-z][A-Za-z0-9+.-]*:\/\//y;
+for(let pos=input.length-1;pos>=0;pos--){
+const ch=input[pos];
+if(ch==="\n"||ch==="\r"||ch==="\u2028"||ch==="\u2029"){
+bracket=paren=-1;next.fill(-1);second.fill(-1);continue;}
+if(ch==="]"){
+let mask=0;
+if(input[pos+1]==="["&&bracket>pos+1)mask|=1;
+if(input[pos+1]==="("&&paren>pos+1){
+mask|=16;
+popular.lastIndex=scheme.lastIndex=pos+2;
+if(popular.test(input))mask|=2;
+if(scheme.test(input))mask|=4;
+if("./?&#".indexOf(input[pos+2])!==-1)mask|=8;
+}
+for(let v=0;v<5;v++)if(mask&(1<<v)){second[v]=next[v];next[v]=pos;}
+bracket=pos;
+}else if(ch===")")paren=pos;
+else if(ch==="["){
+let mask=0;
+for(let v=0;v<5;v++){
+const candidate=v===4||next[v]!==pos+1?next[v]:second[v];
+if(candidate>=pos+(v===4?1:2))mask|=1<<v;
+}
+linkMasks[pos]=mask;
+}
+}
+}
 const n={begin:/<\/?[A-Za-z_]/,end:">",subLanguage:"xml",relevance:0},t={
-variants:[{begin:/\[.+?\]\[.*?\]/,relevance:0},{
-begin:/\[.+?\]\(((data|javascript|mailto):|(?:http|ftp)s?:\/\/).*?\)/,
-relevance:2},{
-begin:e.regex.concat(/\[.+?\]\(/,/[A-Za-z][A-Za-z0-9+.-]*/,/:\/\/.*?\)/),
-relevance:2},{begin:/\[.+?\]\([./?&#].*?\)/,relevance:1},{
-begin:/\[.*?\]\(.*?\)/,relevance:0}],returnBegin:!0,contains:[{match:/\[(?=\])/
+variants:[0,2,2,1,0].map((relevance,v)=>({begin:/\[/,relevance,
+"on:begin":(match,response)=>{
+if(linkInput!==match.input)indexLinks(match.input);
+// Equal decoded strings still need this invocation's reference for later callbacks.
+linkInput=match.input;
+if(!(linkMasks[match.index]&(1<<v)))response.ignoreMatch();
+}})),returnBegin:!0,contains:[{match:/\[(?=\])/
 },{className:"string",relevance:0,begin:"\\[",end:"\\]",excludeBegin:!0,
 returnEnd:!0},{className:"link",relevance:0,begin:"\\]\\(",end:"\\)",
 excludeBegin:!0,excludeEnd:!0},{className:"symbol",relevance:0,begin:"\\]\\[",
@@ -770,7 +806,9 @@ variants:[{begin:/_{2}(?!\s)/,end:/_{2}/},{begin:/\*{2}(?!\s)/,end:/\*{2}/}]
 },i={className:"emphasis",contains:[],variants:[{begin:/\*(?![*\s])/,end:/\*/},{
 begin:/_(?![_\s])/,end:/_/,relevance:0}]},r=e.inherit(a,{contains:[]
 }),s=e.inherit(i,{contains:[]});a.contains.push(s),i.contains.push(r)
-;let o=[n,t];return[a,i,r,s].forEach(e=>{e.contains=e.contains.concat(o)
+// Consume rejected brackets after existing rules, resetting the resumable matcher.
+;const bracketFallback={match:/\[/,relevance:0};
+let o=[n,t,bracketFallback];return[a,i,r,s].forEach(e=>{e.contains=e.contains.concat(o)
 }),o=o.concat(a,i),{name:"Markdown",aliases:["md","mkdown","mkd"],contains:[{
 className:"section",variants:[{begin:"^#{1,6}",end:"$",contains:o},{
 begin:"(?=^.+?\\n[=-]{2,}$)",contains:[{begin:"^[=-]*$"},{begin:"^",end:"\\n",
@@ -784,7 +822,7 @@ contains:[{begin:"^( {4}|\\t)",end:"(\\n)$"}],relevance:0}]},t,{
 begin:/^\[[^\n]+\]:/,returnBegin:!0,contains:[{className:"symbol",begin:/\[/,
 end:/\]/,excludeBegin:!0,excludeEnd:!0},{className:"link",begin:/:\s*/,end:/$/,
 excludeBegin:!0}]},{scope:"literal",
-match:/&([a-zA-Z0-9]+|#[0-9]{1,7}|#[Xx][0-9a-fA-F]{1,6});/}]}},
+match:/&([a-zA-Z0-9]+|#[0-9]{1,7}|#[Xx][0-9a-fA-F]{1,6});/},bracketFallback]}},
 grmr_objectivec:e=>{const n=/[a-zA-Z@][a-zA-Z0-9_]*/,t={$pattern:n,
 keyword:["@interface","@class","@protocol","@implementation"]};return{
 name:"Objective-C",aliases:["mm","objc","obj-c","obj-c++","objective-c++"],
