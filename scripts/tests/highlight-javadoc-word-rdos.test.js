@@ -82,7 +82,7 @@ test('Javadoc lexical callbacks retain ordinary rejection, mutation and shared d
 });
 test('complete Java API native interpreter word workloads grow linearly, not suffix quadratically',()=>{
  const r=spawnSync('node',['--regexp-interpret-all',new URL('fixtures/highlight-javadoc-native.cjs',import.meta.url).pathname],{encoding:'utf8',timeout:30000,maxBuffer:16*1024*1024});expect(r.error).toBeUndefined();expect(r.status).toBe(0);
- const rows=[];let active;for(const line of r.stdout.split('\n')){if(line.startsWith('NATIVE_BEGIN '))active={...JSON.parse(line.slice(13)),instructions:0};else if(line.startsWith('NATIVE_END ')){rows.push({...active,...JSON.parse(line.slice(11))});active=undefined;}else if(active&&line.startsWith('pc = '))active.instructions++;}
+ const rows=[];let active;console.log(r.stdout.split('\n').find(line=>line.startsWith('NATIVE_RUNTIME ')));for(const line of r.stdout.split('\n')){if(line.startsWith('NATIVE_BEGIN '))active={...JSON.parse(line.slice(13)),instructions:0};else if(line.startsWith('NATIVE_END ')){rows.push({...active,...JSON.parse(line.slice(11))});active=undefined;}else if(active&&line.startsWith('pc = '))active.instructions++;}
  for(const kind of ['reject','accept']){const counts=[16,32,64].map(n=>rows.filter(x=>x.n===n&&x.kind===kind).reduce((sum,x)=>sum+x.instructions,0));console.log('NATIVE_COUNTS',kind,counts);expect(counts.every(x=>x>0)).toBe(true);expect(counts[2]).toBeLessThan(counts[1]*2);}
  const targets=rows.filter(x=>x.source.includes('(\\w+@)'));expect(targets.length).toBeGreaterThan(0);expect(targets.every(x=>x.flags==='gm')).toBe(true);
  for(const n of [16,32,64])expect(targets.some(x=>x.n===n&&x.kind==='accept'&&x.index===4&&x.text==='z'.repeat(n)+'@')).toBe(true);

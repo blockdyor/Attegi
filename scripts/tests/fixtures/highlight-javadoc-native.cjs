@@ -1,5 +1,7 @@
 // Exercise complete public API calls in V8's native regexp interpreter.
 const fs=require('node:fs'),vm=require('node:vm'),v8=require('node:v8'),assert=require('node:assert/strict');
+assert.equal(process.versions.bun,undefined,'Native regexp verification requires Node/V8, not Bun');
+console.log('NATIVE_RUNTIME '+JSON.stringify({node:process.version,v8:process.versions.v8}));
 const source=fs.readFileSync(new URL('../../../src/js/libs/highlight.pack.js','file://'+__filename),'utf8');
 process.stdout._handle?.setBlocking(true);
 const ctx=vm.createContext({console});vm.runInContext(source,ctx);
