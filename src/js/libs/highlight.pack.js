@@ -376,7 +376,9 @@ keywords:"return throw case",relevance:0,contains:[m,e.REGEXP_MODE,{
 className:"function",begin:O,returnBegin:!0,end:"\\s*=>",contains:[{
 className:"params",variants:[{begin:e.UNDERSCORE_IDENT_RE,relevance:0},{
 className:null,begin:/\(\s*\)/,skip:!0},{begin:/(\s*)\(/,end:/\)/,
-excludeBegin:!0,excludeEnd:!0,keywords:i,contains:h}]}]},{begin:/,/,relevance:0
+excludeBegin:!0,excludeEnd:!0,keywords:i,contains:h}]},
+// A failed params/end search must consume its whitespace run before retrying.
+{begin:/\s+/,skip:!0,relevance:0}]},{begin:/,/,relevance:0
 },{match:/\s+/,relevance:0},{variants:[{begin:"<>",end:"</>"},{
 match:/<[A-Za-z0-9\\._:-]+\s*\/>/},{begin:a.begin,
 "on:begin":a.isTrulyOpeningTag,end:a.end}],subLanguage:"xml",contains:[{
@@ -430,8 +432,23 @@ className:"subst",begin:/\$\(/,end:/\)/,contains:[e.BACKSLASH_ESCAPE]
 },r=e.inherit(e.COMMENT(),{match:[/(^|\s)/,/#.*$/],scope:{2:"comment"}}),s={
 begin:/<<-?\s*(?=\w+)/,starts:{contains:[e.END_SAME_AS_BEGIN({begin:/(\w+)/,
 end:/(\w+)/,className:"string"})]}},o={className:"string",begin:/"/,end:/"/,
-contains:[e.BACKSLASH_ESCAPE,t,i]};i.contains.push(o);const c={begin:/\$?\(\(/,
-end:/\)\)/,contains:[{begin:/\d+#[0-9a-f]+/,className:"number"},e.NUMBER_MODE,t]
+contains:[e.BACKSLASH_ESCAPE,t,i]};i.contains.push(o);
+let numberInput,numberStart=-1,numberEnd=0,numberValid=!1;
+const numberDigits=/\d+/g,baseNumber={begin:/\d/,end:/\d+#[0-9a-f]+/,
+className:"number",returnBegin:!0,"on:begin":(match,response)=>{
+if(numberInput!==match.input)numberStart=-1;
+numberInput=match.input;
+if(numberStart<0||match.index<numberStart||match.index>=numberEnd){
+numberStart=match.index;numberDigits.lastIndex=match.index;
+numberDigits.exec(match.input);numberEnd=numberDigits.lastIndex;
+numberValid=match.input[numberEnd]==="#"&&/[0-9a-f]/.test(match.input[numberEnd+1]||"");
+}
+if(!numberValid)response.ignoreMatch();
+}};
+const c={begin:/\$?\(\(/,
+end:/\)\)/,contains:[baseNumber,e.NUMBER_MODE,t,
+// Rejected mid-word digits are plain; consume the run without resumable rejection carryover.
+{begin:/\d+/,skip:!0,relevance:0}]
 },l=e.SHEBANG({binary:"(fish|bash|zsh|sh|csh|ksh|tcsh|dash|scsh)",relevance:10
 }),d={className:"function",begin:/\b\w[\w\d_]*\s*\(\s*\)\s*\{/,returnBegin:!0,
 contains:[e.inherit(e.TITLE_MODE,{begin:/\w[\w\d_]*/})],relevance:0};return{
@@ -1206,7 +1223,7 @@ match:[/class\b/,/\s+/,/func\b/,/\s+/,/\b[A-Za-z_][A-Za-z0-9_]*\b/],scope:{
 scope:{1:"keyword",3:"keyword"}},U,z,j,{beginKeywords:"import",end:/$/,
 contains:[...a],relevance:0},A,...l,...g,...p,f,k,...C,...T,R,I]}},
 grmr_typescript:e=>{
-const n=e.regex,t=ge(e),a=te,i=["any","void","number","boolean","string","object","never","symbol","bigint","unknown"],r={
+const t=ge(e),a=te,i=["any","void","number","boolean","string","object","never","symbol","bigint","unknown"],r={
 begin:[/namespace/,/\s+/,e.IDENT_RE],beginScope:{1:"keyword",3:"title.class"}
 },s={beginKeywords:"interface",end:/\{/,excludeEnd:!0,keywords:{
 keyword:"interface extends",built_in:i},contains:[t.exports.CLASS_REFERENCE]
@@ -1216,8 +1233,21 @@ literal:re,built_in:de.concat(i),"variable.language":le},c={className:"meta",
 begin:"@"+a},l=(e,n,t)=>{const a=e.contains.findIndex(e=>e.label===n)
 ;if(-1===a)throw Error("can not find mode to replace");e.contains.splice(a,1,t)}
 ;Object.assign(t.keywords,o),t.exports.PARAMS_CONTAINS.push(c)
-;const d=t.contains.find(e=>"attr"===e.scope),g=Object.assign({},d,{
-match:n.concat(a,n.lookahead(/\s*\?:/))})
+;const d=t.contains.find(e=>"attr"===e.scope);
+let optionalInput,optionalStart=-1,optionalEnd=0,optionalValid=!1;
+const optionalWord=/[0-9A-Za-z$_]+/g,optionalSpace=/\s*/g;
+const g=Object.assign({},d,{begin:/[A-Za-z$_]/,end:/[0-9A-Za-z$_]+/,returnBegin:!0,
+"on:begin":(match,response)=>{
+if(optionalInput!==match.input)optionalStart=-1;
+optionalInput=match.input;
+if(optionalStart<0||match.index<optionalStart||match.index>=optionalEnd){
+optionalStart=match.index;optionalWord.lastIndex=match.index;
+optionalWord.exec(match.input);optionalEnd=optionalWord.lastIndex;
+optionalSpace.lastIndex=optionalEnd;optionalSpace.exec(match.input);
+optionalValid=match.input.slice(optionalSpace.lastIndex,optionalSpace.lastIndex+2)==="?:";
+}
+if(!optionalValid)response.ignoreMatch();
+}});delete g.match
 ;return t.exports.PARAMS_CONTAINS.push([t.exports.CLASS_REFERENCE,d,g]),
 t.contains=t.contains.concat([c,r,s,g]),
 l(t,"shebang",e.SHEBANG()),l(t,"use_strict",{className:"meta",relevance:10,
