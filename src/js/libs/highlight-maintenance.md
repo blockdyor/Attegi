@@ -40,6 +40,9 @@ All issue IDs share prefix `AaGqubYQiPLUZgo8aW`.
 | 2l | S8786 | 759:21–759:32 | Generic-scheme link variant uses the same indexed recognition. |
 | 2m | S8786 | 760:20–760:43 | Relative-link variant uses the same indexed recognition. |
 | 2n | S8786 | 761:6–761:22 | General/empty-label link variant uses the same indexed recognition. |
+| 2P | S8786 | 394:46–394:60 | Shared CSS/Less/SCSS function dispatch uses cached identifier scans with a single-character fallback. |
+| 2d | S8786 | 582:6–582:20 | CSS at-rule attribute dispatch uses the case-insensitive `[a-z-]` alphabet and buffered fallback. |
+| 2x | S8786 | 1070:28–1070:42 | SCSS at-rule attribute dispatch uses the same bounded candidate recognizer. |
 
 Every comparator is `(a,b)=>a<b?-1:a>b?1:0`, not locale-dependent
 `localeCompare`. Existing `.reverse()` calls and exact array order are retained.
@@ -59,6 +62,17 @@ fuzz comparisons, and adds invalid-then-valid streams across all variants and
 four JS line separators, existing Markdown modes, nested calls and fresh equal
 buffers. Per-variant work counts and structural arguments are separate from
 process safety timeouts; CI has no wall-clock performance ceiling assertion.
+
+CSS-family identifier callbacks scan disjoint runs, cache acceptance, and
+refresh their input reference on every callback, including equal fresh buffers.
+Single-character skip fallbacks preserve parent keyword buffers and allow number
+or Unicode-range modes to cross an identifier boundary without losing later
+function suffixes. Less value attributes use the same helper with their existing
+whitespace-before-colon rule. `highlight-css-rdos.test.js` checks actual compiled
+at-rule paths, case/alphabet boundaries, suffix highlighting, fresh input/cache
+refresh counts and disjoint scan work across CSS/Less/SCSS; original-byte integrity
+is checked in `beforeAll` before either VM executes. These checks do not certify
+unrelated grammar paths or impose a CI wall-clock complexity threshold.
 
 ## Regression evidence and repeat commands
 
@@ -96,8 +110,8 @@ behavioral comparisons already pass there, as expected for style-only repairs.
 Build verification is explicitly skipped unless `HIGHLIGHT_VERIFY_BUILD=1`.
 GScan compatibility is not Sonar analysis. These tests are bounded regression
 coverage, not exhaustive input/browser proof or regex safety evidence. The
-recursive JS parameter, Bash function, VB directive and five Markdown link
-occurrences are repaired locally; other original S8786 findings still require triage/fixes and a fresh
+recursive JS parameter, Bash function, VB directive, five Markdown link and
+three shared CSS-family occurrences are repaired locally; other original S8786 findings still require triage/fixes and a fresh
 Sonar analysis is required to establish actual issue status. The exact prepatch
 oracle is retained through original-factory excerpts and inverse grammar,
 statement and sort edits, without changing the pinned checksum.
