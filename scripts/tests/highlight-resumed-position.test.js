@@ -9,7 +9,13 @@ const old='n.compile(),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){';
 const fixed='// Resumed matches are usable only at the current position; do not search a discarded suffix.\n'+'n.compile(),e&&n.matcherRe&&(n.matcherRe=RegExp(n.matcherRe.source,n.matcherRe.flags+"y")),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){';
 let base;
 beforeAll(()=>{
-    base=source.replace(fixed,old);
+    // Undo the independently pinned Java repair before authenticating the reviewed core parent.
+    const java=fixture.originalFunctions.find(row=>row.start==='grmr_java:e=>{');
+    const lo=source.indexOf(java.start),hi=source.indexOf(java.end,lo);
+    assert(lo>=0&&hi>lo);
+    const coreParent=source.slice(0,lo)+java.source+source.slice(hi);
+    assert.equal(createHash('sha256').update(coreParent).digest('hex'),'db3207f83e2e265714ef15244746c27bfa173fbf870be68d732b77526bee2da7');
+    base=coreParent.replace(fixed,old);
     assert.equal(createHash('sha256').update(base).digest('hex'),'403710522aeafacee7eb3fd3978d66ea5408ec2795eec816ec6ae3d62f501975');
     let original=source;
     for(const row of fixture.originalFunctions) {

@@ -151,6 +151,25 @@ optional capture. The full accepted end is provided by the internal opt-in below
 integrity before either VM, failed/later valid candidates, complete accepted
 spans, nonempty custom-emitter chunks, one-time normal-emitter reentry and work.
 
+## Java Javadoc word-guard context repair
+
+The original `\w+@` guard and its successful lexical spans remain unchanged.
+A buffered, relevance-zero word fallback prevents failed words from being
+retried at every suffix. It stops before the existing seven doctag markers,
+using the shared marker expression rather than a copied list. All earlier
+siblings keep priority, including markers beginning inside a word. This bounds
+the guard in this compiled caller; it is not a standalone-regex safety claim or
+a Sonar disposition.
+
+Appending that fallback changes compiler-layout observations: the parent end's
+combined-rule ordinal moves from 4 to 5 and original begin-event arrays have two
+additional undefined trailing captures. The original matched text, lexical
+index and meaningful captures are preserved. A callback branching on the former
+ordinal can make a different decision; arbitrary compiler-layout instrumentation
+identity is not promised. Lexical rejection, ordinary match mutation, shared
+data and reentry remain protected and have explicit regression controls. This
+does not relax private illegal-result index/context compatibility.
+
 ## Narrow matcher-core correction and internal end-span hook
 
 Rejected begins retain the remaining parent-end/illegal rules even after the

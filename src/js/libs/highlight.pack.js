@@ -714,9 +714,12 @@ type:["char","boolean","long","float","int","byte","short","double"],
 built_in:["super","this"]},c={className:"meta",begin:"@"+t,contains:[{
 begin:/\(/,end:/\)/,contains:["self"]}]},l={className:"params",begin:/\(/,
 end:/\)/,keywords:o,relevance:0,contains:[e.C_BLOCK_COMMENT_MODE],endsParent:!0}
-;return{name:"Java",aliases:["jsp"],keywords:o,illegal:/<\/|#/,
-contains:[e.COMMENT("/\\*\\*","\\*/",{relevance:0,contains:[{begin:/\w+@/,
-relevance:0},{className:"doctag",begin:"@[A-Za-z]+"}]}),{
+;const d=e.COMMENT("/\\*\\*","\\*/",{relevance:0,contains:[{begin:/\w+@/,
+relevance:0},{className:"doctag",begin:"@[A-Za-z]+"}]});
+// Buffer failed words without consuming interior COMMENT markers or changing the successful word@ guard.
+d.contains.push({begin:n.concat('(?:(?!',e.C_BLOCK_COMMENT_MODE.contains[0].begin,')\\w)+'),skip:!0,relevance:0});
+return{name:"Java",aliases:["jsp"],keywords:o,illegal:/<\/|#/,
+contains:[d,{
 begin:/import java\.[a-z]+\./,keywords:"import",relevance:2
 },e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE,{begin:/"""/,end:/"""/,
 className:"string",contains:[e.BACKSLASH_ESCAPE]
