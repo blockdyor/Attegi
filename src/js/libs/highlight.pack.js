@@ -141,7 +141,8 @@ this.rules=[],this.multiRegexes=[],
 this.count=0,this.lastIndex=0,this.regexIndex=0}getMatcher(e){
 if(this.multiRegexes[e])return this.multiRegexes[e];const n=new t
 ;return this.rules.slice(e).forEach(([e,t])=>n.addRule(e,t)),
-n.compile(),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){
+// Resumed matches are usable only at the current position; do not search a discarded suffix.
+n.compile(),e&&n.matcherRe&&(n.matcherRe=RegExp(n.matcherRe.source,n.matcherRe.flags+"y")),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){
 return 0!==this.regexIndex}considerAll(){this.regexIndex=0}addRule(e,n){
 this.rules.push([e,n]),"begin"===n.type&&this.count++}exec(e){
 const n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
