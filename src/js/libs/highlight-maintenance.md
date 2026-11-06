@@ -46,6 +46,12 @@ All issue IDs share prefix `AaGqubYQiPLUZgo8aW`.
 | 2O | S8786 | 375:47–375:56 | Consume failed arrow-parent whitespace runs after existing params alternatives; preserve both outer prefixes, including protected2K. |
 | 26 | S8786 | 1165:29–1165:37 | Use cached single-character optional-key candidates instead of repeated suffix lookahead. |
 | 2W | S8786 | 419:28–419:43 | Use cached base-number digit candidates and a plain rejected digit-run fallback in Bash arithmetic. |
+| 2Y | S8786 | 444:49–444:56 | C include: cached nearest close plus same-position fallback. |
+| 2Z | S8786 | 484:68–484:75 | C++ include: same bounded delimiter helper and priority. |
+| 2o | S8786 | 801:47–801:54 | Objective-C include: preserve original line-end behavior. |
+| 2c | S8786 | 558:4–558:14 | C# function end: consume a whole whitespace run plus optional delimiter; cached rejection retains failed runs. |
+| 2r | S8786 | 849:41–849:56 | PHP heredoc: remove failed indentation-prefix retries before delimiter words. |
+| 2s | S8786 | 853:31–853:46 | PHP nowdoc: same maximal-word end matching, original delimiter capture preserved. |
 
 Every comparator is `(a,b)=>a<b?-1:a>b?1:0`, not locale-dependent
 `localeCompare`. Existing `.reverse()` calls and exact array order are retained.
@@ -87,6 +93,23 @@ assigned occurrences, not the whole TypeScript grammar, which remains nonlinear
 on other paths. `highlight-script-arithmetic-rdos.test.js` checks counterfactual
 RED witnesses, exact output/API/aliases, subsequent valid candidates and work.
 
+The C-family subset covers only C/C++/Objective-C includes and the C#
+function end. Include indexing preserves JS-dot line boundaries and sibling
+priority. The C# end consumes the complete accepted whitespace-plus-delimiter
+lexeme, avoiding the rejected early-pop/root-reparse regression; failed runs
+remain buffered inside the function. Original raw strings (2b) remain unrepaired;
+no shared activation-specific closing pointer is used. An unchanged root
+attribute scan can still be nonlinear after a delimiter; this is not original2a
+and is not claimed fixed.
+
+PHP heredoc/nowdoc endings drop only the optional horizontal-whitespace
+prefix. Result HTML/relevance/captures and tested parent/emitter behavior agree;
+consumers wrapping internal `on:end` callbacks through `getLanguage` observe
+changed raw `match[0]`/`match.index` spans (indentation is now body text). This is
+not complete internal callback-event identity. The theme uses `highlightElement`
+and does not wrap these callbacks. PHP class-name path2q remains unrepaired.
+Both focused packets reconstruct the exact original before executing either VM.
+
 ## Regression evidence and repeat commands
 
 `../../../scripts/tests/highlight-vendor-quality.test.js` exercises the actual
@@ -124,8 +147,9 @@ Build verification is explicitly skipped unless `HIGHLIGHT_VERIFY_BUILD=1`.
 GScan compatibility is not Sonar analysis. These tests are bounded regression
 coverage, not exhaustive input/browser proof or regex safety evidence. The
 recursive JS parameter, Bash function, VB directive, five Markdown link,
-three shared CSS-family, arrow whitespace, optional-key and arithmetic-number
-occurrences are repaired locally; other original S8786 findings still require triage/fixes and a fresh
+three shared CSS-family, arrow whitespace, optional-key, arithmetic-number,
+three include, C# function-end and two PHP string-end occurrences are repaired
+locally; other original S8786 findings still require triage/fixes and a fresh
 Sonar analysis is required to establish actual issue status. The exact prepatch
 oracle is retained through original-factory excerpts and inverse grammar,
 statement and sort edits, without changing the pinned checksum.

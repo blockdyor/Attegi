@@ -424,6 +424,43 @@ begin:`\\b0[xX]((${ze})\\.?|(${ze})?\\.(${ze}))[pP][+-]?(${Fe})[fFdD]?\\b`},{
 begin:"\\b(0|[1-9](_*[0-9])*)[lL]?\\b"},{begin:`\\b0[xX](${ze})[lL]?\\b`},{
 begin:"\\b0(_*[0-7])*[lL]?\\b"},{begin:"\\b0[bB][01](_*[01])*[lL]?\\b"}],
 relevance:0};function Ue(e,n,t){return-1===t?"":e.replace(n,a=>Ue(e,n,t-1))}
+function includeAngleBegin(){
+let input,closes=[];
+return(match,response)=>{
+const text=match.input;
+if(input!==text){
+closes=[];let close=-1;
+for(let i=text.length-1;i>=0;i--){
+const ch=text[i];
+if(ch==='\n'||ch==='\r'||ch==='\u2028'||ch==='\u2029')close=-1;
+else if(ch==='>')close=i;
+closes[i]=close;
+}}
+// Rebind equal-valued fresh strings before the next candidate comparison.
+input=text;
+if(closes[match.index]<0)response.ignoreMatch();
+};
+}
+function includeAngleModes(lineEnd){
+return[{scope:"string",begin:/</,end:lineEnd?/$/:/>/,illegal:lineEnd?"\\n":undefined,"on:begin":includeAngleBegin()},
+// Accept invalid starts at the same position, without suppressing sibling modes.
+{begin:/</,relevance:0}];
+}
+function csharpFunctionEnd(){
+let input,next=[];
+return(match,response)=>{
+if(!/\s/.test(match[0]))return;
+const text=match.input;
+if(input!==text){
+next=[];let stop=text.length;
+for(let i=text.length-1;i>=0;i--){
+if(!/\s/.test(text[i]))stop=i;
+next[i]=stop;
+}}
+input=text;
+if(!/[{;=]/.test(text[next[match.index]]||""))response.ignoreMatch();
+};
+}
 var Pe=Object.freeze({__proto__:null,grmr_bash:e=>{const n=e.regex,t={},a={
 begin:/\$\{/,end:/\}/,contains:["self",{begin:/:-/,contains:[t]}]}
 ;Object.assign(t,{className:"variable",variants:[{
@@ -473,8 +510,8 @@ match:/(-?)\b([\d']+(\.[\d']*)?|\.[\d']+)((ll|LL|l|L)(u|U)?|(u|U)(ll|LL|l|L)?|f|
 match:/(-?)\b(0[xX][a-fA-F0-9]+(?:'[a-fA-F0-9]+)*(?:\.[a-fA-F0-9]*(?:'[a-fA-F0-9]*)*)?(?:[pP][-+]?[0-9]+)?(l|L)?(u|U)?)/
 },{match:/(-?)\b\d+(?:'\d+)*(?:\.\d*(?:'\d*)*)?(?:[eE][-+]?\d+)?/}],relevance:0
 },l={scope:"meta",begin:/#\s*include\b/,end:/$/,keywords:{keyword:"include"},
-contains:[{begin:/\\\n/},o,{scope:"string",begin:/<.*?>/
-},t,e.C_BLOCK_COMMENT_MODE]},d={className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
+contains:[{begin:/\\\n/},o,...includeAngleModes(false)
+,t,e.C_BLOCK_COMMENT_MODE]},d={className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
 keywords:{
 keyword:"if else elif endif define undef warning error line pragma _Pragma ifdef ifndef elifdef elifndef include"
 },contains:[{begin:/\\\n/,relevance:0},e.inherit(o,{className:"string"
@@ -513,8 +550,8 @@ begin:"[+-]?(?:(?:\\b[0-9](?:'?[0-9])*\\.(?:[0-9](?:'?[0-9])*)?|\\.[0-9](?:'?[0-
 },{
 begin:"[+-]?\\b(?:0[Bb][01](?:'?[01])*|0[Xx][0-9A-Fa-f](?:'?[0-9A-Fa-f])*|0(?:'?[0-7])*|[1-9](?:'?[0-9])*)(?:[Uu](?:LL?|ll?)|[Uu][Zz]?|(?:LL?|ll?)[Uu]?|[Zz][Uu]|)"
 }],relevance:0},l=[{scope:"meta",begin:/#\s*include\b/,end:/$/,keywords:{
-keyword:"include"},contains:[{begin:/\\\n/},o,{scope:"string",begin:/<.*?>/
-},t,e.C_BLOCK_COMMENT_MODE]},{className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
+keyword:"include"},contains:[{begin:/\\\n/},o,...includeAngleModes(false)
+,t,e.C_BLOCK_COMMENT_MODE]},{className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
 keywords:{
 keyword:"if else elif endif define undef warning error line pragma _Pragma ifdef ifndef include"
 },contains:[{begin:/\\\n/,relevance:0},e.inherit(o,{className:"string"
@@ -587,7 +624,7 @@ begin:"^\\s*\\[(?=[\\w])",excludeBegin:!0,end:"\\]",excludeEnd:!0,contains:[{
 className:"string",begin:/"/,end:/"/}]},{
 beginKeywords:"new return throw await else",relevance:0},{className:"function",
 begin:"("+p+"\\s+)+"+e.IDENT_RE+"\\s*(<[^=]+>\\s*)?\\(",returnBegin:!0,
-end:/\s*[{;=]/,excludeEnd:!0,keywords:n,contains:[{
+end:/\s+[{;=]?|[{;=]/,"on:end":csharpFunctionEnd(),excludeEnd:!0,keywords:n,contains:[{
 beginKeywords:"public private protected static internal protected abstract async extern override unsafe virtual new sealed partial",
 relevance:0},{begin:e.IDENT_RE+"\\s*(<[^=]+>\\s*)?\\(",returnBegin:!0,
 contains:[e.TITLE_MODE,m],relevance:0},{match:/\(\)/},{className:"params",
@@ -870,8 +907,8 @@ contains:[e.BACKSLASH_ESCAPE]}]},{className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
 keywords:{
 keyword:"if else elif endif define undef warning error line pragma ifdef ifndef include"
 },contains:[{begin:/\\\n/,relevance:0},e.inherit(e.QUOTE_STRING_MODE,{
-className:"string"}),{className:"string",begin:/<.*?>/,end:/$/,illegal:"\\n"
-},e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{className:"class",
+className:"string"}),...includeAngleModes(true)
+,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{className:"class",
 begin:"("+t.keyword.join("|")+")\\b",end:/(\{|$)/,excludeEnd:!0,keywords:t,
 contains:[e.UNDERSCORE_TITLE_MODE]},{begin:"\\."+e.UNDERSCORE_IDENT_RE,
 relevance:0}]}},grmr_perl:e=>{const n=e.regex,t=/[dualxmsipngr]{0,12}/,a={
@@ -918,11 +955,11 @@ scope:"variable",match:"\\$+"+a},o={scope:"subst",variants:[{begin:/\$\w+/},{
 begin:/\{\$/,end:/\}/}]},c=e.inherit(e.APOS_STRING_MODE,{illegal:null
 }),l="[ \t\n]",d={scope:"string",variants:[e.inherit(e.QUOTE_STRING_MODE,{
 illegal:null,contains:e.QUOTE_STRING_MODE.contains.concat(o)}),c,{
-begin:/<<<[ \t]*(?:(\w+)|"(\w+)")\n/,end:/[ \t]*(\w+)\b/,
+begin:/<<<[ \t]*(?:(\w+)|"(\w+)")\n/,end:/(\w+)\b/,
 contains:e.QUOTE_STRING_MODE.contains.concat(o),"on:begin":(e,n)=>{
 n.data._beginMatch=e[1]||e[2]},"on:end":(e,n)=>{
 n.data._beginMatch!==e[1]&&n.ignoreMatch()}},e.END_SAME_AS_BEGIN({
-begin:/<<<[ \t]*'(\w+)'\n/,end:/[ \t]*(\w+)\b/})]},g={scope:"number",variants:[{
+begin:/<<<[ \t]*'(\w+)'\n/,end:/(\w+)\b/})]},g={scope:"number",variants:[{
 begin:"\\b0[bB][01]+(?:_[01]+)*\\b"},{begin:"\\b0[oO][0-7]+(?:_[0-7]+)*\\b"},{
 begin:"\\b0[xX][\\da-fA-F]+(?:_[\\da-fA-F]+)*\\b"},{
 begin:"(?:\\b\\d+(?:_\\d+)*(\\.(?:\\d+(?:_\\d+)*))?|\\B\\.\\d+)(?:[eE][+-]?\\d+)?"
