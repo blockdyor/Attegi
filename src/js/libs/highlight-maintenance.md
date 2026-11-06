@@ -43,6 +43,9 @@ All issue IDs share prefix `AaGqubYQiPLUZgo8aW`.
 | 2P | S8786 | 394:46–394:60 | Shared CSS/Less/SCSS function dispatch uses cached identifier scans with a single-character fallback. |
 | 2d | S8786 | 582:6–582:20 | CSS at-rule attribute dispatch uses the case-insensitive `[a-z-]` alphabet and buffered fallback. |
 | 2x | S8786 | 1070:28–1070:42 | SCSS at-rule attribute dispatch uses the same bounded candidate recognizer. |
+| 2O | S8786 | 375:47–375:56 | Consume failed arrow-parent whitespace runs after existing params alternatives; preserve both outer prefixes, including protected2K. |
+| 26 | S8786 | 1165:29–1165:37 | Use cached single-character optional-key candidates instead of repeated suffix lookahead. |
+| 2W | S8786 | 419:28–419:43 | Use cached base-number digit candidates and a plain rejected digit-run fallback in Bash arithmetic. |
 
 Every comparator is `(a,b)=>a<b?-1:a>b?1:0`, not locale-dependent
 `localeCompare`. Existing `.reverse()` calls and exact array order are retained.
@@ -73,6 +76,16 @@ at-rule paths, case/alphabet boundaries, suffix highlighting, fresh input/cache
 refresh counts and disjoint scan work across CSS/Less/SCSS; original-byte integrity
 is checked in `beforeAll` before either VM executes. These checks do not certify
 unrelated grammar paths or impose a CI wall-clock complexity threshold.
+
+The failed-arrow whitespace consumer runs after the original params alternatives,
+preserving their scopes and the protected outer entry prefix. TypeScript optional
+keys cache identifier/whitespace validation; Bash arithmetic base numbers cache
+digit validation, with ordinary numbers still earlier than the plain digit-run
+fallback. Both caches rebind equal fresh inputs and retain the latest candidate-
+containing input until replaced. Their bounded scan arguments apply to the
+assigned occurrences, not the whole TypeScript grammar, which remains nonlinear
+on other paths. `highlight-script-arithmetic-rdos.test.js` checks counterfactual
+RED witnesses, exact output/API/aliases, subsequent valid candidates and work.
 
 ## Regression evidence and repeat commands
 
@@ -110,8 +123,9 @@ behavioral comparisons already pass there, as expected for style-only repairs.
 Build verification is explicitly skipped unless `HIGHLIGHT_VERIFY_BUILD=1`.
 GScan compatibility is not Sonar analysis. These tests are bounded regression
 coverage, not exhaustive input/browser proof or regex safety evidence. The
-recursive JS parameter, Bash function, VB directive, five Markdown link and
-three shared CSS-family occurrences are repaired locally; other original S8786 findings still require triage/fixes and a fresh
+recursive JS parameter, Bash function, VB directive, five Markdown link,
+three shared CSS-family, arrow whitespace, optional-key and arithmetic-number
+occurrences are repaired locally; other original S8786 findings still require triage/fixes and a fresh
 Sonar analysis is required to establish actual issue status. The exact prepatch
 oracle is retained through original-factory excerpts and inverse grammar,
 statement and sort edits, without changing the pinned checksum.
