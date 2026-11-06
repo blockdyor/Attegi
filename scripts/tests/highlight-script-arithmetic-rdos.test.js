@@ -111,6 +111,16 @@ test('optional identifiers retain suffixes, dollars, keys and parameter contexts
     }
 }, 60000);
 
+test('base-number end starts at a literal delimiter without rescanning digit suffixes', () => {
+    for (const digits of ['2', '0012', '123456789']) {
+        for (const tail of ['#ff', '#a#ff', '#aZ', '#Ff', '#g', '#0a + 2#ff']) {
+            same(`$((a${digits}${tail}))`, 'bash');
+        }
+    }
+    const number = walk(after.getLanguage('bash')).find(m => m.scope === 'number' && m['on:begin']);
+    expect(number.endRe.source).toBe('#[0-9a-f]+');
+});
+
 test('Bash arithmetic retains base digits, adjacent modes and awkward functions', () => {
     for (const prefix of ['', 'a', '2#', '$x', ' ']) for (const digits of ['1', '111', '0012']) {
         for (const tail of ['!', '#ff', '#Ff', '#0a', '#g', '#', '.2', '#a$HOME + 12', '#a)) echo 3']) same('$(( ' + prefix + digits + tail, 'bash');

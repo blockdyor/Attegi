@@ -434,7 +434,7 @@ begin:/<<-?\s*(?=\w+)/,starts:{contains:[e.END_SAME_AS_BEGIN({begin:/(\w+)/,
 end:/(\w+)/,className:"string"})]}},o={className:"string",begin:/"/,end:/"/,
 contains:[e.BACKSLASH_ESCAPE,t,i]};i.contains.push(o);
 let numberInput,numberStart=-1,numberEnd=0,numberValid=!1;
-const numberDigits=/\d+/g,baseNumber={begin:/\d/,end:/\d+#[0-9a-f]+/,
+const numberDigits=/\d+/g,baseNumber={begin:/\d/,end:/#[0-9a-f]+/,
 className:"number",returnBegin:!0,"on:begin":(match,response)=>{
 if(numberInput!==match.input)numberStart=-1;
 numberInput=match.input;
