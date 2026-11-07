@@ -2,6 +2,9 @@
   Highlight.js v11.12.0 (git: f7f7d3803b)
   (c) 2006-2026 Josh Goebel <hello@joshgoebel.com> and other contributors
   License: BSD-3-Clause
+  Attegi local maintenance: statement-form mode transforms, explicit UTF-16
+  string sorting, and removal of an unused WASM regex data-property read.
+  Based on upstream 11.12.0; not byte-identical. Recursive JS parameter scan repaired.
  */
 var hljs=function(){"use strict";function e(n){
 return n instanceof Map?n.clear=n.delete=n.set=()=>{
@@ -13,8 +16,197 @@ const a=n[t],i=typeof a;"object"!==i&&"function"!==i||Object.isFrozen(a)||e(a)
 void 0===e.data&&(e.data={}),this.data=e.data,this.isMatchIgnored=!1}
 ignoreMatch(){this.isMatchIgnored=!0}}function t(e){
 return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;")
-}function a(e,...n){const t=Object.create(null);for(const n in e)t[n]=e[n]
-;return n.forEach(e=>{for(const n in e)t[n]=e[n]}),t}const i=e=>!!e.scope
+}const ownedRecognizers=new WeakMap,compiledRecognizers=new WeakMap;
+function ownPhp(rule,name,slot){
+const raw=rule.match||rule.begin,parts=Array.isArray(raw)?raw.map(l):null;
+const source=parts?h(raw,{joinWith:""}):l(raw),atom=name.slice(0,name.lastIndexOf("{1,}")+"{1,}".length);
+const prefix=parts?parts.slice(0,slot).join(""):slot===-1?"#\\[\\s*\\\\?":"";
+const suffix=name.slice(atom.length)+(parts?parts.slice(slot+1).join(""):""),captures=p(source);
+let cachedInput,cachedFlags,ends,last,prefixRe,recovery,recoveryKey;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,upper=new Uint8Array(len+1),lower=new Uint8Array(len+1);
+const head=RegExp("[A-Z]",flags+"y"),tail=RegExp("[a-z0-9_\\x7f-\\xff]",flags+"y"),after=RegExp(suffix,flags+"y");
+for(let i=0;i<len;i++){head.lastIndex=tail.lastIndex=i;upper[i]=head.test(input);lower[i]=tail.test(input);}
+const end=new Int32Array(len+1).fill(-1),capture=new Int32Array(len+1).fill(-1),aEnd=new Int32Array(len+2).fill(-1),bEnd=new Int32Array(len+2).fill(-1);
+// Rightmost viable endpoints implement greedy runs; loop success precedes its suffix.
+for(let i=len;i>=0;i--){
+const first=input[i]==="\\"?i+1:i;
+let next=-1;
+if(upper[first]){
+const a=aEnd[first+1];
+if(a>=first+2)next=a;
+else next=bEnd[first+1];
+}
+if(next>=0){end[i]=end[next];capture[i]=capture[next]<0?i:capture[next];}
+else{after.lastIndex=i;if(after.test(input))end[i]=i;}
+aEnd[i]=lower[i]&&aEnd[i+1]>=0?aEnd[i+1]:end[i]>=0?i:-1;
+bEnd[i]=upper[i]&&bEnd[i+1]>=0?bEnd[i+1]:end[i]>=0&&upper[i]&&lower[i+1]?i:-1;
+}
+ends=end;last=capture;prefixRe=RegExp(prefix,flags+"y");cachedFlags=flags;recoveryKey=undefined;
+}
+cachedInput=input;
+prefixRe.lastIndex=at;const start=prefixRe.exec(input);if(start===null)return null;
+const begin=prefixRe.lastIndex,cap=last[begin];
+if(cap<0&&slot!==-1)return null;
+// Native recovery has only fixed-width name pieces, retaining every real capture.
+const key=cap<0?"fallback":(cap-begin)+":"+(ends[begin]-cap);
+if(key!==recoveryKey){
+const fixed=cap<0?"(?!)()":"(?:[\\s\\S]{"+(cap-begin)+"})([\\s\\S]{"+(ends[begin]-cap)+"})";
+recovery=RegExp(source.replace(atom,fixed),flags+"y");recoveryKey=key;
+}
+recovery.lastIndex=at;return recovery.exec(input);
+};
+const selector=(slot===-1?"#\\[":parts&&slot===3?"new":"(?:\\\\|[A-Z])")+"()".repeat(captures);
+return ownMode(rule,{select,selector,captures});
+}
+function ownRecognizer(rule,span){
+ownedRecognizers.set(rule,{shape:Object.assign({},rule),span});return rule;
+}
+function ownIni(rule){
+const source=l(rule.begin),captures=p(source);
+let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,spaces=new Uint8Array(len),bare=new Uint8Array(len),gaps=new Uint32Array(len+1),next=new Uint8Array(len+1),after=new Uint8Array(len+1),single=new Uint8Array(len+2),double=new Uint8Array(len+2),run=new Uint8Array(len+1);
+const space=RegExp("\\s",flags+"y"),key=RegExp("[A-Za-z0-9_-]",flags+"y");
+for(let i=0;i<len;i++){space.lastIndex=key.lastIndex=i;spaces[i]=space.exec(input)!==null;bare[i]=key.exec(input)!==null;}
+gaps[len]=len;for(let i=len-1;i>=0;i--)gaps[i]=spaces[i]?gaps[i+1]:i;
+for(let i=len;i>=0;i--){
+const gap=gaps[i],value=input[gap]==="="?gaps[gap+1]:len;
+after[i]=(value<len&&input[value]!=="#")||(input[gap]==="."&&next[gaps[gap+1]]);
+if(i===len)continue;
+run[i]=bare[i]&&(after[i+1]||run[i+1]);
+single[i]=input[i]==="'"?after[i+1]:single[i+1];
+double[i]=input[i]==='"'?after[i+1]:double[i+1]||(input[i]==="\\"&&input[i+1]==='"'&&double[i+2]);
+next[i]=run[i]||(input[i]==="'"&&single[i+1])||(input[i]==='"'&&double[i+1]);
+}
+cachedFlags=flags;eligible=next;full=RegExp(source,flags+"y");
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+const shape=Object.assign({},rule);shape.scope=shape.className;delete shape.className;
+ownedRecognizers.set(rule,{shape,select,selector:`[A-Za-z0-9_"'-]`+"()".repeat(captures),captures});return rule;
+}
+function ownSwift(rule,two){
+const source=l(rule.match||rule.begin),captures=p(source);
+let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,heads=new Uint8Array(len),tails=new Uint8Array(len),spaces=new Uint8Array(len),ends=new Uint32Array(len+1),gaps=new Uint32Array(len+1),next=new Uint8Array(len+1);
+const head=RegExp(ke,flags+"y"),tail=RegExp(xe,flags+"y"),space=RegExp("\\s",flags+"y"),native=RegExp(source,flags+"y");
+for(let i=0;i<len;i++){head.lastIndex=tail.lastIndex=space.lastIndex=i;heads[i]=head.exec(input)!==null;tails[i]=tail.exec(input)!==null;spaces[i]=space.exec(input)!==null;}
+ends[len]=gaps[len]=len;
+for(let i=len-1;i>=0;i--){ends[i]=tails[i]?ends[i+1]:i;gaps[i]=spaces[i]?gaps[i+1]:i;}
+for(let i=0;i<len;i++)if(heads[i]){const end=ends[i+1],gap=gaps[end];
+if(input[gap]===":")next[i]=1;
+else if(two&&gap>end&&heads[gap]&&input[gaps[ends[gap+1]]]===":")next[i]=1;
+}
+cachedFlags=flags;eligible=next;full=native;
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+const shape=Object.assign({},rule);if(shape.match){shape.begin=shape.match;delete shape.match;}
+ownedRecognizers.set(rule,{shape,select,selector:ke,captures});return rule;
+}
+function ownComment(rule,phrase){
+const source=l(rule.begin),captures=phrase?3:1;
+const marker="(?:TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):";
+let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const next=new Uint8Array(input.length+1),native=RegExp(source,flags+"y");
+if(phrase){
+// One whole begin per maximal space run; three fixed word windows bound overlap.
+for(let i=0;i<input.length;){
+if(input.charCodeAt(i)!==32){i++;continue;}
+const start=i;while(i<input.length&&input.charCodeAt(i)===32)i++;
+native.lastIndex=start;if(native.exec(input)!==null)next.fill(1,start,i);
+}
+}else{
+const keyword=RegExp(marker,flags+"y");
+for(let i=input.length-1;i>=0;){
+if(input.charCodeAt(i)===32){i--;continue;}
+keyword.lastIndex=i;
+if(keyword.exec(input)!==null){
+next[i]=1;while(i>0&&input.charCodeAt(i-1)===32)next[--i]=1;
+}
+i--;
+}
+}
+// Only the latest input/actual matcher flags are retained; reentry may evict them.
+cachedFlags=flags;eligible=next;full=native;
+}
+// Equal-valued decoded strings must rebind the current reference on cache hits too.
+cachedInput=input;
+if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+const selector=phrase?"[ ]()()()":"(?:[ ]|(?="+marker+"))()";
+ownedRecognizers.set(rule,{shape:Object.assign({},rule),select,selector,captures});return rule;
+}
+// Private source attestation: only compiler-owned copies may carry these records.
+const modeRecognizers=new WeakMap,variantCaches=new WeakMap;
+function modeShape(rule,deep=false){
+const proto=Object.getPrototypeOf(rule);
+if(proto!==null&&proto!==Object.prototype&&proto!==Array.prototype&&proto!==RegExp.prototype)return null;
+const keys=Reflect.ownKeys(rule),values=[],enumerable=[],nested=[];
+for(const key of keys){
+const descriptor=Object.getOwnPropertyDescriptor(rule,key);
+if(!Object.prototype.hasOwnProperty.call(descriptor,"value"))return null;
+const value=descriptor.value;values.push(value);enumerable.push(descriptor.enumerable);
+if(value&&typeof value==="object"&&(deep||["begin","match","end","scope","beginScope","endScope","variants","cachedVariants"].includes(key))){
+const shape=modeShape(value,key!=="variants"&&key!=="cachedVariants");if(!shape)return null;nested.push(shape);
+}
+}
+const source=proto===RegExp.prototype?rule.source:null,flags=proto===RegExp.prototype?rule.flags:null;
+return()=>Object.getPrototypeOf(rule)===proto&&Reflect.ownKeys(rule).length===keys.length&&
+keys.every((key,i)=>{const descriptor=Object.getOwnPropertyDescriptor(rule,key);return descriptor&&Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.value===values[i]&&descriptor.enumerable===enumerable[i];})&&
+(source===null||rule.source===source&&rule.flags===flags)&&nested.every(shape=>shape());
+}
+function ownMode(rule,recognizer){
+const shape=modeShape(rule);if(shape)modeRecognizers.set(rule,{shape,recognizer});return rule;
+}
+function authenticatedMode(rule){const record=modeRecognizers.get(rule);return record&&record.shape()?record:null;}
+function copyMode(rule,overrides={}){
+const record=authenticatedMode(rule),copy=a(rule,overrides);
+if(record)ownMode(copy,record.recognizer);return copy;
+}
+function variantMode(wrapper,leaf){
+const parent=authenticatedMode(wrapper),record=authenticatedMode(leaf);
+const copy=a(wrapper,{variants:null},leaf);
+if(parent&&record)ownMode(copy,record.recognizer);return copy;
+}
+function cachedModes(wrapper){
+const parent=authenticatedMode(wrapper);
+if(wrapper.variants&&!wrapper.cachedVariants){
+wrapper.cachedVariants=wrapper.variants.map(leaf=>variantMode(wrapper,leaf));
+if(parent)variantCaches.set(wrapper,{cache:wrapper.cachedVariants,shape:modeShape(wrapper.cachedVariants)});
+}
+const record=variantCaches.get(wrapper),cache=wrapper.cachedVariants;
+if(!cache||!Array.isArray(cache)||record&&record.cache===cache&&record.shape&&record.shape())return cache;
+// Read a public cache exactly as the compiler's ordinary concat, never its methods.
+const copies=[].concat(cache);
+for(let i=0;i<copies.length;i++)if(authenticatedMode(copies[i]))copies[i]=a(copies[i]);
+return copies;
+}
+function ownData(rule){
+if(rule==null)return true;
+const proto=Object.getPrototypeOf(rule);
+return(proto===null||proto===Object.prototype)&&Reflect.ownKeys(rule).every(key=>Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptor(rule,key),"value"));
+}
+function ownedRecognizer(rule){
+const record=ownedRecognizers.get(rule);
+const proto=Object.getPrototypeOf(rule);
+return record&&(proto===null||proto===Object.prototype)&&
+Reflect.ownKeys(rule).length===Object.keys(record.shape).length&&
+Reflect.ownKeys(rule).every(key=>{const descriptor=Object.getOwnPropertyDescriptor(rule,key);
+return Object.prototype.hasOwnProperty.call(record.shape,key)&&Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.value===record.shape[key];})?record:null;
+}
+function a(e,...n){const trusted=ownedRecognizers.has(e)&&ownData(e)&&n.every(ownData),t=Object.create(null);for(const n in e)t[n]=e[n]
+;return n.forEach(e=>{for(const n in e)t[n]=e[n]}),trusted&&ownedRecognizers.set(t,ownedRecognizers.get(e)),t}const i=e=>!!e.scope
 ;class r{constructor(e,n){
 this.buffer="",this.classPrefix=n.classPrefix,e.walk(this)}addText(e){
 this.buffer+=t(e)}openNode(e){if(!i(e))return;const n=((e,{prefix:n})=>{
@@ -58,11 +250,11 @@ const f="[a-zA-Z]\\w*",E="[a-zA-Z_]\\w*",y="\\b\\d+(\\.\\d+)?",w="(-?)(\\b0[xX][
 begin:"\\\\[\\s\\S]",relevance:0},k={scope:"string",begin:"'",end:"'",
 illegal:"\\n",contains:[N]},x={scope:"string",begin:'"',end:'"',illegal:"\\n",
 contains:[N]},O=(e,n,t={})=>{const i=a({scope:"comment",begin:e,end:n,
-contains:[]},t);i.contains.push({scope:"doctag",
+contains:[]},t);i.contains.push(ownComment({scope:"doctag",
 begin:"[ ]*(?=(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):)",
-end:/(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):/,excludeBegin:!0,relevance:0})
+end:/(TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):/,excludeBegin:!0,relevance:0},!1))
 ;const r=m("I","a","is","so","us","to","at","if","in","it","on",/[A-Za-z]+['](d|ve|re|ll|t|s|n)/,/[A-Za-z]+[-][a-z]+/,/[A-Za-z][a-z]{2,}/)
-;return i.contains.push({begin:b(/[ ]+/,"(",r,/[.]?[:]?([.][ ]|[ ])/,"){3}")}),i
+;return i.contains.push(ownComment({begin:b(/[ ]+/,"(",r,/[.]?[:]?([.][ ]|[ ])/,"){3}")},!0)),i
 },M=O("//","$"),A=O("/\\*","\\*/"),S=O("#","$");var C=Object.freeze({
 __proto__:null,APOS_STRING_MODE:k,BACKSLASH_ESCAPE:N,BINARY_NUMBER_MODE:{
 scope:"number",begin:v,relevance:0},BINARY_NUMBER_RE:v,COMMENT:O,
@@ -83,20 +275,20 @@ end:/$/,relevance:0,"on:begin":(e,n)=>{0!==e.index&&n.ignoreMatch()}},e)},
 TITLE_MODE:{scope:"title",begin:f,relevance:0},UNDERSCORE_IDENT_RE:E,
 UNDERSCORE_TITLE_MODE:{scope:"title",begin:E,relevance:0}});function T(e,n){
 "."===e.input[e.index-1]&&n.ignoreMatch()}function R(e,n){
-void 0!==e.className&&(e.scope=e.className,delete e.className)}function D(e,n){
-n&&e.beginKeywords&&(e.begin="\\b("+e.beginKeywords.split(" ").join("|")+")(?!\\.)(?=\\b|\\s)",
-e.__beforeBegin=T,e.keywords=e.keywords||e.beginKeywords,delete e.beginKeywords,
-void 0===e.relevance&&(e.relevance=0))}function I(e,n){
+if(void 0!==e.className){e.scope=e.className;delete e.className;}}function D(e,n){
+if(n&&e.beginKeywords){e.begin="\\b("+e.beginKeywords.split(" ").join("|")+")(?!\\.)(?=\\b|\\s)";
+e.__beforeBegin=T;e.keywords=e.keywords||e.beginKeywords;delete e.beginKeywords;
+if(void 0===e.relevance){e.relevance=0;}}}function I(e,n){
 Array.isArray(e.illegal)&&(e.illegal=m(...e.illegal))}function L(e,n){
 if(e.match){
 if(e.begin||e.end)throw Error("begin & end are not supported with match")
-;e.begin=e.match,delete e.match}}function B(e,n){
+;e.begin=e.match;delete e.match;}}function B(e,n){
 void 0===e.relevance&&(e.relevance=1)}const F=(e,n)=>{if(!e.beforeMatch)return
 ;if(e.starts)throw Error("beforeMatch cannot be used with starts")
 ;const t=Object.assign({},e);Object.keys(e).forEach(n=>{delete e[n]
-}),e.keywords=t.keywords,e.begin=b(t.beforeMatch,d(t.begin)),e.starts={
+});e.keywords=t.keywords;e.begin=b(t.beforeMatch,d(t.begin));e.starts={
 relevance:0,contains:[Object.assign(t,{endsParent:!0})]
-},e.relevance=0,delete t.beforeMatch
+};e.relevance=0;delete t.beforeMatch;
 },$=["of","and","for","in","not","or","if","then","parent","list","value"]
 ;function z(e,n,t="keyword"){const a=Object.create(null)
 ;return"string"==typeof e?i(t,e.split(" ")):Array.isArray(e)?i(t,e):Object.keys(e).forEach(t=>{
@@ -109,8 +301,8 @@ U[`${e}/${n}`]||(console.log(`Deprecated as of ${e}. ${n}`),U[`${e}/${n}`]=!0)
 },q=Error();function G(e,n,{key:t}){let a=0;const i=e[t],r={},s={}
 ;for(let e=1;e<=n.length;e++)s[e+a]=i[e],r[e+a]=!0,a+=p(n[e-1])
 ;e[t]=s,e[t]._emit=r,e[t]._multi=!0}function Z(e){(e=>{
-e.scope&&"object"==typeof e.scope&&null!==e.scope&&(e.beginScope=e.scope,
-delete e.scope)})(e),"string"==typeof e.beginScope&&(e.beginScope={
+if(e.scope&&"object"==typeof e.scope&&null!==e.scope){e.beginScope=e.scope;
+delete e.scope;}})(e),"string"==typeof e.beginScope&&(e.beginScope={
 _wrap:e.beginScope}),"string"==typeof e.endScope&&(e.endScope={_wrap:e.endScope
 }),(e=>{if(Array.isArray(e.begin)){
 if(e.skip||e.excludeBegin||e.returnBegin)throw P("skip, excludeBegin, returnBegin not compatible with beginScope: {}"),
@@ -127,9 +319,12 @@ return RegExp(l(n),"m"+(e.case_insensitive?"i":"")+(e.unicodeRegex?"u":"")+(t?"g
 }class t{constructor(){
 this.matchIndexes={},this.regexes=[],this.matchAt=1,this.position=0}
 addRule(e,n){
-n.position=this.position++,this.matchIndexes[this.matchAt]=n,this.regexes.push([n,e]),
+n=Object.assign({},n,{position:this.position++}),this.matchIndexes[this.matchAt]=n,this.regexes.push([n,e]),
 this.matchAt+=p(e)+1}compile(){0===this.regexes.length&&(this.exec=()=>null)
-;const e=this.regexes.map(e=>e[1]);this.matcherRe=n(h(e,{joinWith:"|"
+;const e=this.regexes.map(e=>e[1]);
+// Validate the ordinary combined matcher under current flags before substituting owned selectors.
+if(this.regexes.some(([e])=>e.rule&&compiledRecognizers.has(e.rule)))n(h(this.regexes.map(([e,n])=>e.rule&&compiledRecognizers.has(e.rule)?e.rule.begin:n),{joinWith:"|"}),!0);
+this.matcherRe=n(h(e,{joinWith:"|"
 }),!0),this.lastIndex=0}exec(e){this.matcherRe.lastIndex=this.lastIndex
 ;const n=this.matcherRe.exec(e);if(!n)return null
 ;const t=n.findIndex((e,n)=>n>0&&void 0!==e),a=this.matchIndexes[t]
@@ -138,20 +333,61 @@ this.rules=[],this.multiRegexes=[],
 this.count=0,this.lastIndex=0,this.regexIndex=0}getMatcher(e){
 if(this.multiRegexes[e])return this.multiRegexes[e];const n=new t
 ;return this.rules.slice(e).forEach(([e,t])=>n.addRule(e,t)),
-n.compile(),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){
+// Resumed matches are usable only at the current position; do not search a discarded suffix.
+n.compile(),e&&n.matcherRe&&(n.matcherRe=RegExp(n.matcherRe.source,n.matcherRe.flags+"y")),this.multiRegexes[e]=n,n}resumingScanAtSamePosition(){
 return 0!==this.regexIndex}considerAll(){this.regexIndex=0}addRule(e,n){
-this.rules.push([e,n]),"begin"===n.type&&this.count++}exec(e){
-const n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
+this.rules.push([e,n]),"begin"===n.type&&this.count++,
+n.rule&&compiledRecognizers.has(n.rule)&&(this.hasOwnedFilter=!0)}execOwned(input,match,offset,flags){
+flags=flags.replace(/[gy]/g,"");
+// Only a genuine owned rejection enters Unicode-safe local continuation.
+const advance=at=>{const c=input.charCodeAt(at),d=input.charCodeAt(at+1);
+return at+(flags.includes("u")&&c>=55296&&c<=56319&&d>=56320&&d<=57343?2:1)};
+// Rejected COMMENT selectors must not change the selecting matcher's relative rule position.
+let commentOffset;
+while(match){
+const owned=match.rule&&compiledRecognizers.get(match.rule);
+if(owned&&owned.select){
+if(commentOffset===undefined)commentOffset=offset-match.position-1;
+const full=owned.select(input,match.index,flags);
+// Empty doctag begins are real matches; restore undefined captures too, before callbacks.
+if(full!==null){for(let i=0;i<=owned.captures;i++)match[i]=full[i];
+match.position=offset-commentOffset-1;this.regexIndex=offset;return match;}
+}else if(owned){const end=owned.span(input,match.index,flags);
+// Materialize the original full begin before the parser captures its lexeme; no mode lowering.
+if(end>match.index){match[0]=input.slice(match.index,end);this.regexIndex=offset;return match;}
+}else{
+if(commentOffset!==undefined)match.position=offset-commentOffset-1;
+this.regexIndex=offset;return match;}
+let cursor=match.index;
+for(;;){
+const matcher=this.getMatcher(offset);matcher.lastIndex=cursor;match=matcher.exec(input);
+if(matcher.matcherRe)flags=matcher.matcherRe.flags.replace(/[gy]/g,"");
+if(offset&&(!match||match.index!==cursor)||match&&match.index<cursor){
+cursor=advance(cursor);offset=0;commentOffset=undefined;if(cursor>input.length)return null;continue;
+}
+break;
+}
+if(match)offset+=match.position+1;
+}
+return null;
+}exec(e){
+let n=this.getMatcher(this.regexIndex);n.lastIndex=this.lastIndex
 ;let t=n.exec(e)
 ;if(this.resumingScanAtSamePosition())if(t&&t.index===this.lastIndex);else{
-const n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,t=n.exec(e)}
-return t&&(this.regexIndex+=t.position+1,
-this.regexIndex===this.count&&this.considerAll()),t}}
+n=this.getMatcher(0);n.lastIndex=this.lastIndex+1,this.regexIndex=0,t=n.exec(e)}
+if(this.hasOwnedFilter&&t&&compiledRecognizers.has(t.rule))return this.execOwned(e,t,this.regexIndex+t.position+1,n.matcherRe.flags);
+// Rejection must retain end/illegal alternatives after the last begin.
+return t&&(this.regexIndex+=t.position+1),t}}
 if(e.compilerExtensions||(e.compilerExtensions=[]),
 e.contains&&e.contains.includes("self"))throw Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.")
 ;return e.classNameAliases=a(e.classNameAliases||{}),function t(r,s){const o=r
 ;if(r.isCompiled)return o
-;[R,L,Z,F].forEach(e=>e(r,s)),e.compilerExtensions.forEach(e=>e(r,s)),
+;const mode=s&&authenticatedMode(r);
+[R,L,Z,F].forEach(e=>e(r,s));
+const normalized=mode&&modeShape(r);
+e.compilerExtensions.forEach(e=>e(r,s));
+const owned=s&&(mode?(normalized&&normalized()?mode.recognizer:null):ownedRecognizer(r));
+
 r.__beforeBegin=null,[D,I,B].forEach(e=>e(r,s)),r.isCompiled=!0;let c=null
 ;return"object"==typeof r.keywords&&r.keywords.$pattern&&(r.keywords=Object.assign({},r.keywords),
 c=r.keywords.$pattern,
@@ -161,12 +397,11 @@ s&&(r.begin||(r.begin=/\B|\b/),o.beginRe=n(o.begin),r.end||r.endsWithParent||(r.
 r.end&&(o.endRe=n(o.end)),
 o.terminatorEnd=l(o.end)||"",r.endsWithParent&&s.terminatorEnd&&(o.terminatorEnd+=(r.end?"|":"")+s.terminatorEnd)),
 r.illegal&&(o.illegalRe=n(r.illegal)),
-r.contains||(r.contains=[]),r.contains=[].concat(...r.contains.map(e=>(e=>(e.variants&&!e.cachedVariants&&(e.cachedVariants=e.variants.map(n=>a(e,{
-variants:null},n))),e.cachedVariants?e.cachedVariants:Q(e)?a(e,{
-starts:e.starts?a(e.starts):null
-}):Object.isFrozen(e)?a(e):e))("self"===e?r:e))),r.contains.forEach(e=>{t(e,o)
-}),r.starts&&t(r.starts,s),o.matcher=(e=>{const n=new i
-;return e.contains.forEach(e=>n.addRule(e.begin,{rule:e,type:"begin"
+r.contains||(r.contains=[]),r.contains=[].concat(...r.contains.map(e=>(e=>cachedModes(e)|| (Q(e)?copyMode(e,{
+starts:e.starts?copyMode(e.starts):null
+}):Object.isFrozen(e)?copyMode(e):e))("self"===e?r:e))),r.contains.forEach(e=>{t(e,o)
+}),r.starts&&t(r.starts,s),owned&&compiledRecognizers.set(o,owned.select?{select:owned.select,selector:owned.selector,captures:owned.captures}:{span:owned.span}),o.matcher=(e=>{const n=new i
+;return e.contains.forEach(e=>n.addRule(compiledRecognizers.has(e)?(compiledRecognizers.get(e).selector||/[_A-Za-z]/):e.begin,{rule:e,type:"begin"
 })),e.terminatorEnd&&n.addRule(e.terminatorEnd,{type:"end"
 }),e.illegal&&n.addRule(e.illegal,{type:"illegal"}),n})(o),o}(e)}function Q(e){
 return!!e&&(e.endsWithParent||Q(e.starts))}class X extends Error{
@@ -207,13 +442,20 @@ function m(e,n){
 return e.scope&&"string"==typeof e.scope&&S.openNode(k.classNameAliases[e.scope]||e.scope),
 e.beginScope&&(e.beginScope._wrap?(u(C,k.classNameAliases[e.beginScope._wrap]||e.beginScope._wrap),
 C=""):e.beginScope._multi&&(b(e.beginScope,n),C="")),M=Object.create(e,{parent:{
-value:M}}),M}function _(e,t,a){let i=((e,n)=>{const t=e&&e.exec(n)
+value:M}}),M}let endLexeme;function _(e,t,a){let i=((e,n)=>{const t=e&&e.exec(n)
 ;return t&&0===t.index})(e.endRe,a);if(i){if(e["on:end"]){const a=new n(e)
-;e["on:end"](t,a),a.isMatchIgnored&&(i=!1)}if(i){
+;e["on:end"](t,a);if(a.isMatchIgnored)i=!1;
+else if(Object.prototype.hasOwnProperty.call(a,"_endLexeme"))endLexeme=a._endLexeme;
+}if(i){
 for(;e.endsParent&&e.parent;)e=e.parent;return e}}
 if(e.endsWithParent)return _(e.parent,t,a)}function h(e){
-return 0===M.matcher.regexIndex?(C+=e[0],1):(I=!0,0)}function y(e){
-const n=e[0],a=t.substring(e.index),i=_(M,e,a);if(!i)return Y;const r=M
+return 0===M.matcher.regexIndex?(C+=e,1):(I=!0,0)}function y(e){
+// Only accepted end callbacks opt in; existing match-array mutation semantics stay unchanged.
+endLexeme=Y;const original=e[0],index=e.index,a=t.substring(index),i=_(M,e,a);if(!i)return Y;
+if(endLexeme!==Y&&(typeof endLexeme!=="string"||!endLexeme.length||endLexeme.length<original.length||
+e.index!==index||index+endLexeme.length>t.length||!t.startsWith(endLexeme,index)||M.endScope&&M.endScope._multi))
+throw Error("Invalid end lexeme");
+const n=endLexeme===Y?original:endLexeme,r=M
 ;M.endScope&&M.endScope._wrap?(g(),
 u(n,M.endScope._wrap)):M.endScope&&M.endScope._multi?(g(),
 b(M.endScope,e)):r.skip?C+=n:(r.returnEnd||r.excludeEnd||(C+=n),
@@ -224,12 +466,12 @@ let w={};function v(a,r){const o=r&&r[0];if(C+=a,null==o)return g(),0
 ;if("begin"===w.type&&"end"===r.type&&w.index===r.index&&""===o){
 if(C+=t.slice(r.index,r.index+1),!s){const n=Error(`0 width match regex (${e})`)
 ;throw n.languageName=e,n.badRule=w.rule,n}return 1}
-if(w=r,"begin"===r.type)return(e=>{
+if("begin"===r.type)return(e=>{
 const t=e[0],a=e.rule,i=new n(a),r=[a.__beforeBegin,a["on:begin"]]
 ;for(const n of r)if(n&&(n(e,i),i.isMatchIgnored))return h(t)
-;return a.skip?C+=t:(a.excludeBegin&&(C+=t),
+;w=e;return a.skip?C+=t:(a.excludeBegin&&(C+=t),
 g(),a.returnBegin||a.excludeBegin||(C=t)),m(a,e),a.returnBegin?0:t.length})(r)
-;if("illegal"===r.type&&!i){
+;w=r;if("illegal"===r.type&&!i){
 const e=Error('Illegal lexeme "'+o+'" for mode "'+(M.scope||"<unnamed>")+'"')
 ;throw e.mode=M,e}if("end"===r.type){const e=y(r);if(e!==Y)return e}
 if("illegal"===r.type&&""===o)return r.index===t.length||(C+="\n"),1
@@ -340,7 +582,7 @@ endsParent:!0,relevance:0},{begin:/(?=[^\n])\s/,relevance:0}]}]
 }),e.C_BLOCK_COMMENT_MODE,e.C_LINE_COMMENT_MODE]
 },p=[e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,d,g,u,b,{match:/\$\d+/},c]
 ;l.contains=p.concat({begin:/\{/,end:/\}/,keywords:i,contains:["self"].concat(p)
-});const _=[].concat(m,l.contains),h=_.concat([{begin:/(\s*)\(/,end:/\)/,
+});const _=[].concat(m,l.contains),h=_.concat([{begin:/\(/,end:/\)/,
 keywords:i,contains:["self"].concat(_)}]),f={className:"params",begin:/(\s*)\(/,
 end:/\)/,excludeBegin:!0,excludeEnd:!0,keywords:i,contains:h},E={variants:[{
 match:[/class/,/\s+/,t,/\s+/,/extends/,/\s+/,n.concat(t,"(",n.concat(/\./,t),")*")],
@@ -373,7 +615,9 @@ keywords:"return throw case",relevance:0,contains:[m,e.REGEXP_MODE,{
 className:"function",begin:O,returnBegin:!0,end:"\\s*=>",contains:[{
 className:"params",variants:[{begin:e.UNDERSCORE_IDENT_RE,relevance:0},{
 className:null,begin:/\(\s*\)/,skip:!0},{begin:/(\s*)\(/,end:/\)/,
-excludeBegin:!0,excludeEnd:!0,keywords:i,contains:h}]}]},{begin:/,/,relevance:0
+excludeBegin:!0,excludeEnd:!0,keywords:i,contains:h}]},
+// A failed params/end search must consume its whitespace run before retrying.
+{begin:/\s+/,skip:!0,relevance:0}]},{begin:/,/,relevance:0
 },{match:/\s+/,relevance:0},{variants:[{begin:"<>",end:"</>"},{
 match:/<[A-Za-z0-9\\._:-]+\s*\/>/},{begin:a.begin,
 "on:begin":a.isTrulyOpeningTag,end:a.end}],subLanguage:"xml",contains:[{
@@ -385,19 +629,31 @@ className:"title.function"})]},{match:/\.\.\./,relevance:0},k,{match:"\\$"+t,
 relevance:0},{match:[/\bconstructor(?=\s*\()/],className:{1:"title.function"},
 contains:[f]},v,{relevance:0,match:/\b[A-Z][A-Z_0-9]+\b/,
 className:"variable.constant"},E,x,{match:/\$[(.]/}]}}
+function cssIdentifier(suffix){return(e,n)=>{
+// Ignored single-character starts share one identifier scan, not repeated suffix scans.
+const t=n.data;if(t.input!==e.input||e.index<t.start||e.index>=t.end){
+const n=suffix===":"?/[a-z-]+/gi:/[\w-]+/g;n.lastIndex=e.index;const a=n.exec(e.input);
+t.start=e.index;t.end=e.index+a[0].length;
+t.accept=suffix===":"?e.input[t.end]===suffix:suffix(e.input,t.end)}
+t.input=e.input;
+if(!t.accept)n.ignoreMatch()}}
 const ue=e=>b(/\b/,e,/\w$/.test(e)?/\b/:/\B/),be=["Protocol","Type"].map(ue),me=["init","self"].map(ue),pe=["Any","Self"],_e=["actor","any","associatedtype","async","await",/as\?/,/as!/,"as","borrowing","break","case","catch","class","consume","consuming","continue","convenience","copy","default","defer","deinit","didSet","distributed","do","dynamic","each","else","enum","extension","fallthrough",/fileprivate\(set\)/,"fileprivate","final","for","func","get","guard","if","import","indirect","infix",/init\?/,/init!/,"inout",/internal\(set\)/,"internal","in","is","isolated","nonisolated","lazy","let","macro","mutating","nonmutating",/open\(set\)/,"open","operator","optional","override","package","postfix","precedencegroup","prefix",/private\(set\)/,"private","protocol",/public\(set\)/,"public","repeat","required","rethrows","return","set","some","static","struct","subscript","super","switch","throws","throw",/try\?/,/try!/,"try","typealias",/unowned\(safe\)/,/unowned\(unsafe\)/,"unowned","var","weak","where","while","willSet"],he=["false","nil","true"],fe=["assignment","associativity","higherThan","left","lowerThan","none","right"],Ee=["#colorLiteral","#column","#dsohandle","#else","#elseif","#endif","#error","#file","#fileID","#fileLiteral","#filePath","#function","#if","#imageLiteral","#keyPath","#line","#selector","#sourceLocation","#warning"],ye=["abs","all","any","assert","assertionFailure","debugPrint","dump","fatalError","getVaList","isKnownUniquelyReferenced","max","min","numericCast","pointwiseMax","pointwiseMin","precondition","preconditionFailure","print","readLine","repeatElement","sequence","stride","swap","swift_unboxFromSwiftValueWithType","transcode","type","unsafeBitCast","unsafeDowncast","withExtendedLifetime","withUnsafeMutablePointer","withUnsafePointer","withVaList","withoutActuallyEscaping","zip"],we=m(/[/=\-+!*%<>&|^~?]/,/[\u00A1-\u00A7]/,/[\u00A9\u00AB]/,/[\u00AC\u00AE]/,/[\u00B0\u00B1]/,/[\u00B6\u00BB\u00BF\u00D7\u00F7]/,/[\u2016-\u2017]/,/[\u2020-\u2027]/,/[\u2030-\u203E]/,/[\u2041-\u2053]/,/[\u2055-\u205E]/,/[\u2190-\u23FF]/,/[\u2500-\u2775]/,/[\u2794-\u2BFF]/,/[\u2E00-\u2E7F]/,/[\u3001-\u3003]/,/[\u3008-\u3020]/,/[\u3030]/),ve=m(we,/[\u0300-\u036F]/,/[\u1DC0-\u1DFF]/,/[\u20D0-\u20FF]/,/[\uFE00-\uFE0F]/,/[\uFE20-\uFE2F]/),Ne=b(we,ve,"*"),ke=m(/[a-zA-Z_]/,/[\u00A8\u00AA\u00AD\u00AF\u00B2-\u00B5\u00B7-\u00BA]/,/[\u00BC-\u00BE\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u00FF]/,/[\u0100-\u02FF\u0370-\u167F\u1681-\u180D\u180F-\u1DBF]/,/[\u1E00-\u1FFF]/,/[\u200B-\u200D\u202A-\u202E\u203F-\u2040\u2054\u2060-\u206F]/,/[\u2070-\u20CF\u2100-\u218F\u2460-\u24FF\u2776-\u2793]/,/[\u2C00-\u2DFF\u2E80-\u2FFF]/,/[\u3004-\u3007\u3021-\u302F\u3031-\u303F\u3040-\uD7FF]/,/[\uF900-\uFD3D\uFD40-\uFDCF\uFDF0-\uFE1F\uFE30-\uFE44]/,/[\uFE47-\uFEFE\uFF00-\uFFFD]/),xe=m(ke,/\d/,/[\u0300-\u036F\u1DC0-\u1DFF\u20D0-\u20FF\uFE20-\uFE2F]/),Oe=b(ke,xe,"*"),Me=b(/[A-Z]/,xe,"*"),Ae=["attached","autoclosure",b(/convention\(/,m("swift","block","c"),/\)/),"discardableResult","dynamicCallable","dynamicMemberLookup","escaping","freestanding","frozen","GKInspectable","IBAction","IBDesignable","IBInspectable","IBOutlet","IBSegueAction","inlinable","main","nonobjc","NSApplicationMain","NSCopying","NSManaged",b(/objc\(/,Oe,/\)/),"objc","objcMembers","propertyWrapper","requires_stored_property_inits","resultBuilder","Sendable","testable","UIApplicationMain","unchecked","unknown","usableFromInline","warn_unqualified_access"],Se=["iOS","iOSApplicationExtension","macOS","macOSApplicationExtension","macCatalyst","macCatalystApplicationExtension","watchOS","watchOSApplicationExtension","tvOS","tvOSApplicationExtension","swift"],Ce=e=>({
 IMPORTANT:{scope:"meta",begin:"!important"},
 BLOCK_COMMENT:e.C_BLOCK_COMMENT_MODE,HEXCOLOR:{scope:"number",
 begin:/#(([0-9a-fA-F]{3,4})|(([0-9a-fA-F]{2}){3,4}))\b/},UNICODE_RANGE:{
 scope:"number",
 begin:/\b[Uu]\+[0-9A-Fa-f][0-9A-Fa-f?]{0,5}(-[0-9A-Fa-f][0-9A-Fa-f]{0,5})?/},
-FUNCTION_DISPATCH:{className:"built_in",begin:/[\w-]+(?=\()/},
+FUNCTION_DISPATCH:{variants:[{
+className:"built_in",begin:/[\w-]/,end:/(?=[^\w-]|$)/,
+"on:begin":cssIdentifier((e,n)=>e[n]==="(")},
+// Accept failed starts without flushing the parent's keyword buffer or retry state.
+{begin:/[\w-]/,skip:!0}]},
 ATTRIBUTE_SELECTOR_MODE:{scope:"selector-attr",begin:/\[/,end:/\]/,illegal:"$",
 contains:[e.APOS_STRING_MODE,e.QUOTE_STRING_MODE]},CSS_NUMBER_MODE:{
 scope:"number",
 begin:e.NUMBER_RE+"(%|em|ex|ch|rem|vw|vh|vmin|vmax|cm|mm|in|pt|pc|px|deg|grad|rad|turn|s|ms|Hz|kHz|dpi|dpcm|dppx)?",
 relevance:0},CSS_VARIABLE:{className:"attr",begin:/--[A-Za-z_][A-Za-z0-9_-]*/}
-}),Te=["a","abbr","address","article","aside","audio","b","blockquote","body","button","canvas","caption","cite","code","dd","del","details","dfn","div","dl","dt","em","fieldset","figcaption","figure","footer","form","h1","h2","h3","h4","h5","h6","header","hgroup","html","i","iframe","img","input","ins","kbd","label","legend","li","main","mark","menu","nav","object","ol","optgroup","option","p","picture","q","quote","samp","section","select","source","span","strong","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","tr","ul","var","video","defs","g","marker","mask","pattern","svg","switch","symbol","feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feFlood","feGaussianBlur","feImage","feMerge","feMorphology","feOffset","feSpecularLighting","feTile","feTurbulence","linearGradient","radialGradient","stop","circle","ellipse","image","line","path","polygon","polyline","rect","text","use","textPath","tspan","foreignObject","clipPath"],Re=["any-hover","any-pointer","aspect-ratio","color","color-gamut","color-index","device-aspect-ratio","device-height","device-width","display-mode","forced-colors","grid","height","hover","inverted-colors","monochrome","orientation","overflow-block","overflow-inline","pointer","prefers-color-scheme","prefers-contrast","prefers-reduced-motion","prefers-reduced-transparency","resolution","scan","scripting","update","width","min-width","max-width","min-height","max-height"].sort().reverse(),De=["active","any-link","blank","checked","current","default","defined","dir","disabled","drop","empty","enabled","first","first-child","first-of-type","fullscreen","future","focus","focus-visible","focus-within","has","host","host-context","hover","indeterminate","in-range","invalid","is","lang","last-child","last-of-type","left","link","local-link","not","nth-child","nth-col","nth-last-child","nth-last-col","nth-last-of-type","nth-of-type","only-child","only-of-type","optional","out-of-range","past","placeholder-shown","read-only","read-write","required","right","root","scope","target","target-within","user-invalid","valid","visited","where"].sort().reverse(),Ie=["after","backdrop","before","cue","cue-region","first-letter","first-line","grammar-error","marker","part","placeholder","selection","slotted","spelling-error"].sort().reverse(),Le=["accent-color","align-content","align-items","align-self","alignment-baseline","all","anchor-name","animation","animation-composition","animation-delay","animation-direction","animation-duration","animation-fill-mode","animation-iteration-count","animation-name","animation-play-state","animation-range","animation-range-end","animation-range-start","animation-timeline","animation-timing-function","appearance","aspect-ratio","backdrop-filter","backface-visibility","background","background-attachment","background-blend-mode","background-clip","background-color","background-image","background-origin","background-position","background-position-x","background-position-y","background-repeat","background-size","baseline-shift","block-size","border","border-block","border-block-color","border-block-end","border-block-end-color","border-block-end-style","border-block-end-width","border-block-start","border-block-start-color","border-block-start-style","border-block-start-width","border-block-style","border-block-width","border-bottom","border-bottom-color","border-bottom-left-radius","border-bottom-right-radius","border-bottom-style","border-bottom-width","border-collapse","border-color","border-end-end-radius","border-end-start-radius","border-image","border-image-outset","border-image-repeat","border-image-slice","border-image-source","border-image-width","border-inline","border-inline-color","border-inline-end","border-inline-end-color","border-inline-end-style","border-inline-end-width","border-inline-start","border-inline-start-color","border-inline-start-style","border-inline-start-width","border-inline-style","border-inline-width","border-left","border-left-color","border-left-style","border-left-width","border-radius","border-right","border-right-color","border-right-style","border-right-width","border-spacing","border-start-end-radius","border-start-start-radius","border-style","border-top","border-top-color","border-top-left-radius","border-top-right-radius","border-top-style","border-top-width","border-width","bottom","box-align","box-decoration-break","box-direction","box-flex","box-flex-group","box-lines","box-ordinal-group","box-orient","box-pack","box-shadow","box-sizing","break-after","break-before","break-inside","caption-side","caret-color","clear","clip","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","color-scheme","column-count","column-fill","column-gap","column-rule","column-rule-color","column-rule-style","column-rule-width","column-span","column-width","columns","contain","contain-intrinsic-block-size","contain-intrinsic-height","contain-intrinsic-inline-size","contain-intrinsic-size","contain-intrinsic-width","container","container-name","container-type","content","content-visibility","corner-bottom-left-shape","corner-bottom-right-shape","corner-shape","corner-top-left-shape","corner-top-right-shape","counter-increment","counter-reset","counter-set","cue","cue-after","cue-before","cursor","cx","cy","direction","display","dominant-baseline","empty-cells","enable-background","field-sizing","fill","fill-opacity","fill-rule","filter","flex","flex-basis","flex-direction","flex-flow","flex-grow","flex-shrink","flex-wrap","float","flood-color","flood-opacity","flow","font","font-display","font-family","font-feature-settings","font-kerning","font-language-override","font-optical-sizing","font-palette","font-size","font-size-adjust","font-smooth","font-smoothing","font-stretch","font-style","font-synthesis","font-synthesis-position","font-synthesis-small-caps","font-synthesis-style","font-synthesis-weight","font-variant","font-variant-alternates","font-variant-caps","font-variant-east-asian","font-variant-emoji","font-variant-ligatures","font-variant-numeric","font-variant-position","font-variation-settings","font-weight","forced-color-adjust","gap","glyph-orientation-horizontal","glyph-orientation-vertical","grid","grid-area","grid-auto-columns","grid-auto-flow","grid-auto-rows","grid-column","grid-column-end","grid-column-start","grid-gap","grid-row","grid-row-end","grid-row-start","grid-template","grid-template-areas","grid-template-columns","grid-template-rows","hanging-punctuation","height","hyphenate-character","hyphenate-limit-chars","hyphens","icon","image-orientation","image-rendering","image-resolution","ime-mode","initial-letter","initial-letter-align","inline-size","inset","inset-area","inset-block","inset-block-end","inset-block-start","inset-inline","inset-inline-end","inset-inline-start","isolation","justify-content","justify-items","justify-self","kerning","left","letter-spacing","lighting-color","line-break","line-height","line-height-step","list-style","list-style-image","list-style-position","list-style-type","margin","margin-block","margin-block-end","margin-block-start","margin-bottom","margin-inline","margin-inline-end","margin-inline-start","margin-left","margin-right","margin-top","margin-trim","marker","marker-end","marker-mid","marker-start","marks","mask","mask-border","mask-border-mode","mask-border-outset","mask-border-repeat","mask-border-slice","mask-border-source","mask-border-width","mask-clip","mask-composite","mask-image","mask-mode","mask-origin","mask-position","mask-repeat","mask-size","mask-type","masonry-auto-flow","math-depth","math-shift","math-style","max-block-size","max-height","max-inline-size","max-width","min-block-size","min-height","min-inline-size","min-width","mix-blend-mode","nav-down","nav-index","nav-left","nav-right","nav-up","none","normal","object-fit","object-position","offset","offset-anchor","offset-distance","offset-path","offset-position","offset-rotate","opacity","order","orphans","outline","outline-color","outline-offset","outline-style","outline-width","overflow","overflow-anchor","overflow-block","overflow-clip-margin","overflow-inline","overflow-wrap","overflow-x","overflow-y","overlay","overscroll-behavior","overscroll-behavior-block","overscroll-behavior-inline","overscroll-behavior-x","overscroll-behavior-y","padding","padding-block","padding-block-end","padding-block-start","padding-bottom","padding-inline","padding-inline-end","padding-inline-start","padding-left","padding-right","padding-top","page","page-break-after","page-break-before","page-break-inside","paint-order","pause","pause-after","pause-before","perspective","perspective-origin","place-content","place-items","place-self","pointer-events","position","position-anchor","position-visibility","print-color-adjust","quotes","r","resize","rest","rest-after","rest-before","right","rotate","row-gap","ruby-align","ruby-position","scale","scroll-behavior","scroll-margin","scroll-margin-block","scroll-margin-block-end","scroll-margin-block-start","scroll-margin-bottom","scroll-margin-inline","scroll-margin-inline-end","scroll-margin-inline-start","scroll-margin-left","scroll-margin-right","scroll-margin-top","scroll-padding","scroll-padding-block","scroll-padding-block-end","scroll-padding-block-start","scroll-padding-bottom","scroll-padding-inline","scroll-padding-inline-end","scroll-padding-inline-start","scroll-padding-left","scroll-padding-right","scroll-padding-top","scroll-snap-align","scroll-snap-stop","scroll-snap-type","scroll-timeline","scroll-timeline-axis","scroll-timeline-name","scrollbar-color","scrollbar-gutter","scrollbar-width","shape-image-threshold","shape-margin","shape-outside","shape-rendering","speak","speak-as","src","stop-color","stop-opacity","stroke","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke-width","tab-size","table-layout","text-align","text-align-all","text-align-last","text-anchor","text-combine-upright","text-decoration","text-decoration-color","text-decoration-line","text-decoration-skip","text-decoration-skip-ink","text-decoration-style","text-decoration-thickness","text-emphasis","text-emphasis-color","text-emphasis-position","text-emphasis-style","text-indent","text-justify","text-orientation","text-overflow","text-rendering","text-shadow","text-size-adjust","text-transform","text-underline-offset","text-underline-position","text-wrap","text-wrap-mode","text-wrap-style","timeline-scope","top","touch-action","transform","transform-box","transform-origin","transform-style","transition","transition-behavior","transition-delay","transition-duration","transition-property","transition-timing-function","translate","unicode-bidi","unicode-range","user-modify","user-select","vector-effect","vertical-align","view-timeline","view-timeline-axis","view-timeline-inset","view-timeline-name","view-transition-name","visibility","voice-balance","voice-duration","voice-family","voice-pitch","voice-range","voice-rate","voice-stress","voice-volume","white-space","white-space-collapse","widows","width","will-change","word-break","word-spacing","word-wrap","writing-mode","x","y","z-index","zoom"].sort().reverse(),Be=De.concat(Ie).sort().reverse()
+}),Te=["a","abbr","address","article","aside","audio","b","blockquote","body","button","canvas","caption","cite","code","dd","del","details","dfn","div","dl","dt","em","fieldset","figcaption","figure","footer","form","h1","h2","h3","h4","h5","h6","header","hgroup","html","i","iframe","img","input","ins","kbd","label","legend","li","main","mark","menu","nav","object","ol","optgroup","option","p","picture","q","quote","samp","section","select","source","span","strong","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","tr","ul","var","video","defs","g","marker","mask","pattern","svg","switch","symbol","feBlend","feColorMatrix","feComponentTransfer","feComposite","feConvolveMatrix","feDiffuseLighting","feDisplacementMap","feFlood","feGaussianBlur","feImage","feMerge","feMorphology","feOffset","feSpecularLighting","feTile","feTurbulence","linearGradient","radialGradient","stop","circle","ellipse","image","line","path","polygon","polyline","rect","text","use","textPath","tspan","foreignObject","clipPath"],Re=["any-hover","any-pointer","aspect-ratio","color","color-gamut","color-index","device-aspect-ratio","device-height","device-width","display-mode","forced-colors","grid","height","hover","inverted-colors","monochrome","orientation","overflow-block","overflow-inline","pointer","prefers-color-scheme","prefers-contrast","prefers-reduced-motion","prefers-reduced-transparency","resolution","scan","scripting","update","width","min-width","max-width","min-height","max-height"].sort((a,b)=>a<b?-1:a>b?1:0).reverse(),De=["active","any-link","blank","checked","current","default","defined","dir","disabled","drop","empty","enabled","first","first-child","first-of-type","fullscreen","future","focus","focus-visible","focus-within","has","host","host-context","hover","indeterminate","in-range","invalid","is","lang","last-child","last-of-type","left","link","local-link","not","nth-child","nth-col","nth-last-child","nth-last-col","nth-last-of-type","nth-of-type","only-child","only-of-type","optional","out-of-range","past","placeholder-shown","read-only","read-write","required","right","root","scope","target","target-within","user-invalid","valid","visited","where"].sort((a,b)=>a<b?-1:a>b?1:0).reverse(),Ie=["after","backdrop","before","cue","cue-region","first-letter","first-line","grammar-error","marker","part","placeholder","selection","slotted","spelling-error"].sort((a,b)=>a<b?-1:a>b?1:0).reverse(),Le=["accent-color","align-content","align-items","align-self","alignment-baseline","all","anchor-name","animation","animation-composition","animation-delay","animation-direction","animation-duration","animation-fill-mode","animation-iteration-count","animation-name","animation-play-state","animation-range","animation-range-end","animation-range-start","animation-timeline","animation-timing-function","appearance","aspect-ratio","backdrop-filter","backface-visibility","background","background-attachment","background-blend-mode","background-clip","background-color","background-image","background-origin","background-position","background-position-x","background-position-y","background-repeat","background-size","baseline-shift","block-size","border","border-block","border-block-color","border-block-end","border-block-end-color","border-block-end-style","border-block-end-width","border-block-start","border-block-start-color","border-block-start-style","border-block-start-width","border-block-style","border-block-width","border-bottom","border-bottom-color","border-bottom-left-radius","border-bottom-right-radius","border-bottom-style","border-bottom-width","border-collapse","border-color","border-end-end-radius","border-end-start-radius","border-image","border-image-outset","border-image-repeat","border-image-slice","border-image-source","border-image-width","border-inline","border-inline-color","border-inline-end","border-inline-end-color","border-inline-end-style","border-inline-end-width","border-inline-start","border-inline-start-color","border-inline-start-style","border-inline-start-width","border-inline-style","border-inline-width","border-left","border-left-color","border-left-style","border-left-width","border-radius","border-right","border-right-color","border-right-style","border-right-width","border-spacing","border-start-end-radius","border-start-start-radius","border-style","border-top","border-top-color","border-top-left-radius","border-top-right-radius","border-top-style","border-top-width","border-width","bottom","box-align","box-decoration-break","box-direction","box-flex","box-flex-group","box-lines","box-ordinal-group","box-orient","box-pack","box-shadow","box-sizing","break-after","break-before","break-inside","caption-side","caret-color","clear","clip","clip-path","clip-rule","color","color-interpolation","color-interpolation-filters","color-profile","color-rendering","color-scheme","column-count","column-fill","column-gap","column-rule","column-rule-color","column-rule-style","column-rule-width","column-span","column-width","columns","contain","contain-intrinsic-block-size","contain-intrinsic-height","contain-intrinsic-inline-size","contain-intrinsic-size","contain-intrinsic-width","container","container-name","container-type","content","content-visibility","corner-bottom-left-shape","corner-bottom-right-shape","corner-shape","corner-top-left-shape","corner-top-right-shape","counter-increment","counter-reset","counter-set","cue","cue-after","cue-before","cursor","cx","cy","direction","display","dominant-baseline","empty-cells","enable-background","field-sizing","fill","fill-opacity","fill-rule","filter","flex","flex-basis","flex-direction","flex-flow","flex-grow","flex-shrink","flex-wrap","float","flood-color","flood-opacity","flow","font","font-display","font-family","font-feature-settings","font-kerning","font-language-override","font-optical-sizing","font-palette","font-size","font-size-adjust","font-smooth","font-smoothing","font-stretch","font-style","font-synthesis","font-synthesis-position","font-synthesis-small-caps","font-synthesis-style","font-synthesis-weight","font-variant","font-variant-alternates","font-variant-caps","font-variant-east-asian","font-variant-emoji","font-variant-ligatures","font-variant-numeric","font-variant-position","font-variation-settings","font-weight","forced-color-adjust","gap","glyph-orientation-horizontal","glyph-orientation-vertical","grid","grid-area","grid-auto-columns","grid-auto-flow","grid-auto-rows","grid-column","grid-column-end","grid-column-start","grid-gap","grid-row","grid-row-end","grid-row-start","grid-template","grid-template-areas","grid-template-columns","grid-template-rows","hanging-punctuation","height","hyphenate-character","hyphenate-limit-chars","hyphens","icon","image-orientation","image-rendering","image-resolution","ime-mode","initial-letter","initial-letter-align","inline-size","inset","inset-area","inset-block","inset-block-end","inset-block-start","inset-inline","inset-inline-end","inset-inline-start","isolation","justify-content","justify-items","justify-self","kerning","left","letter-spacing","lighting-color","line-break","line-height","line-height-step","list-style","list-style-image","list-style-position","list-style-type","margin","margin-block","margin-block-end","margin-block-start","margin-bottom","margin-inline","margin-inline-end","margin-inline-start","margin-left","margin-right","margin-top","margin-trim","marker","marker-end","marker-mid","marker-start","marks","mask","mask-border","mask-border-mode","mask-border-outset","mask-border-repeat","mask-border-slice","mask-border-source","mask-border-width","mask-clip","mask-composite","mask-image","mask-mode","mask-origin","mask-position","mask-repeat","mask-size","mask-type","masonry-auto-flow","math-depth","math-shift","math-style","max-block-size","max-height","max-inline-size","max-width","min-block-size","min-height","min-inline-size","min-width","mix-blend-mode","nav-down","nav-index","nav-left","nav-right","nav-up","none","normal","object-fit","object-position","offset","offset-anchor","offset-distance","offset-path","offset-position","offset-rotate","opacity","order","orphans","outline","outline-color","outline-offset","outline-style","outline-width","overflow","overflow-anchor","overflow-block","overflow-clip-margin","overflow-inline","overflow-wrap","overflow-x","overflow-y","overlay","overscroll-behavior","overscroll-behavior-block","overscroll-behavior-inline","overscroll-behavior-x","overscroll-behavior-y","padding","padding-block","padding-block-end","padding-block-start","padding-bottom","padding-inline","padding-inline-end","padding-inline-start","padding-left","padding-right","padding-top","page","page-break-after","page-break-before","page-break-inside","paint-order","pause","pause-after","pause-before","perspective","perspective-origin","place-content","place-items","place-self","pointer-events","position","position-anchor","position-visibility","print-color-adjust","quotes","r","resize","rest","rest-after","rest-before","right","rotate","row-gap","ruby-align","ruby-position","scale","scroll-behavior","scroll-margin","scroll-margin-block","scroll-margin-block-end","scroll-margin-block-start","scroll-margin-bottom","scroll-margin-inline","scroll-margin-inline-end","scroll-margin-inline-start","scroll-margin-left","scroll-margin-right","scroll-margin-top","scroll-padding","scroll-padding-block","scroll-padding-block-end","scroll-padding-block-start","scroll-padding-bottom","scroll-padding-inline","scroll-padding-inline-end","scroll-padding-inline-start","scroll-padding-left","scroll-padding-right","scroll-padding-top","scroll-snap-align","scroll-snap-stop","scroll-snap-type","scroll-timeline","scroll-timeline-axis","scroll-timeline-name","scrollbar-color","scrollbar-gutter","scrollbar-width","shape-image-threshold","shape-margin","shape-outside","shape-rendering","speak","speak-as","src","stop-color","stop-opacity","stroke","stroke-dasharray","stroke-dashoffset","stroke-linecap","stroke-linejoin","stroke-miterlimit","stroke-opacity","stroke-width","tab-size","table-layout","text-align","text-align-all","text-align-last","text-anchor","text-combine-upright","text-decoration","text-decoration-color","text-decoration-line","text-decoration-skip","text-decoration-skip-ink","text-decoration-style","text-decoration-thickness","text-emphasis","text-emphasis-color","text-emphasis-position","text-emphasis-style","text-indent","text-justify","text-orientation","text-overflow","text-rendering","text-shadow","text-size-adjust","text-transform","text-underline-offset","text-underline-position","text-wrap","text-wrap-mode","text-wrap-style","timeline-scope","top","touch-action","transform","transform-box","transform-origin","transform-style","transition","transition-behavior","transition-delay","transition-duration","transition-property","transition-timing-function","translate","unicode-bidi","unicode-range","user-modify","user-select","vector-effect","vertical-align","view-timeline","view-timeline-axis","view-timeline-inset","view-timeline-name","view-transition-name","visibility","voice-balance","voice-duration","voice-family","voice-pitch","voice-range","voice-rate","voice-stress","voice-volume","white-space","white-space-collapse","widows","width","will-change","word-break","word-spacing","word-wrap","writing-mode","x","y","z-index","zoom"].sort((a,b)=>a<b?-1:a>b?1:0).reverse(),Be=De.concat(Ie).sort((a,b)=>a<b?-1:a>b?1:0).reverse()
 ;var Fe="[0-9](_*[0-9])*",$e=`\\.(${Fe})`,ze="[0-9a-fA-F](_*[0-9a-fA-F])*",je={
 className:"number",variants:[{
 begin:`(\\b(${Fe})((${$e})|\\.)?|(${$e}))[eE][+-]?(${Fe})[fFdD]?\\b`},{
@@ -407,6 +663,43 @@ begin:`\\b0[xX]((${ze})\\.?|(${ze})?\\.(${ze}))[pP][+-]?(${Fe})[fFdD]?\\b`},{
 begin:"\\b(0|[1-9](_*[0-9])*)[lL]?\\b"},{begin:`\\b0[xX](${ze})[lL]?\\b`},{
 begin:"\\b0(_*[0-7])*[lL]?\\b"},{begin:"\\b0[bB][01](_*[01])*[lL]?\\b"}],
 relevance:0};function Ue(e,n,t){return-1===t?"":e.replace(n,a=>Ue(e,n,t-1))}
+function includeAngleBegin(){
+let input,closes=[];
+return(match,response)=>{
+const text=match.input;
+if(input!==text){
+closes=[];let close=-1;
+for(let i=text.length-1;i>=0;i--){
+const ch=text[i];
+if(ch==='\n'||ch==='\r'||ch==='\u2028'||ch==='\u2029')close=-1;
+else if(ch==='>')close=i;
+closes[i]=close;
+}}
+// Rebind equal-valued fresh strings before the next candidate comparison.
+input=text;
+if(closes[match.index]<0)response.ignoreMatch();
+};
+}
+function includeAngleModes(lineEnd){
+return[{scope:"string",begin:/</,end:lineEnd?/$/:/>/,illegal:lineEnd?"\\n":undefined,"on:begin":includeAngleBegin()},
+// Accept invalid starts at the same position, without suppressing sibling modes.
+{begin:/</,relevance:0}];
+}
+function csharpFunctionEnd(){
+let input,next=[];
+return(match,response)=>{
+if(!/\s/.test(match[0]))return;
+const text=match.input;
+if(input!==text){
+next=[];let stop=text.length;
+for(let i=text.length-1;i>=0;i--){
+if(!/\s/.test(text[i]))stop=i;
+next[i]=stop;
+}}
+input=text;
+if(!/[{;=]/.test(text[next[match.index]]||""))response.ignoreMatch();
+};
+}
 var Pe=Object.freeze({__proto__:null,grmr_bash:e=>{const n=e.regex,t={},a={
 begin:/\$\{/,end:/\}/,contains:["self",{begin:/:-/,contains:[t]}]}
 ;Object.assign(t,{className:"variable",variants:[{
@@ -415,10 +708,25 @@ className:"subst",begin:/\$\(/,end:/\)/,contains:[e.BACKSLASH_ESCAPE]
 },r=e.inherit(e.COMMENT(),{match:[/(^|\s)/,/#.*$/],scope:{2:"comment"}}),s={
 begin:/<<-?\s*(?=\w+)/,starts:{contains:[e.END_SAME_AS_BEGIN({begin:/(\w+)/,
 end:/(\w+)/,className:"string"})]}},o={className:"string",begin:/"/,end:/"/,
-contains:[e.BACKSLASH_ESCAPE,t,i]};i.contains.push(o);const c={begin:/\$?\(\(/,
-end:/\)\)/,contains:[{begin:/\d+#[0-9a-f]+/,className:"number"},e.NUMBER_MODE,t]
+contains:[e.BACKSLASH_ESCAPE,t,i]};i.contains.push(o);
+let numberInput,numberStart=-1,numberEnd=0,numberValid=!1;
+const numberDigits=/\d+/g,baseNumber={begin:/\d/,end:/#[0-9a-f]+/,
+className:"number",returnBegin:!0,"on:begin":(match,response)=>{
+if(numberInput!==match.input)numberStart=-1;
+numberInput=match.input;
+if(numberStart<0||match.index<numberStart||match.index>=numberEnd){
+numberStart=match.index;numberDigits.lastIndex=match.index;
+numberDigits.exec(match.input);numberEnd=numberDigits.lastIndex;
+numberValid=match.input[numberEnd]==="#"&&/[0-9a-f]/.test(match.input[numberEnd+1]||"");
+}
+if(!numberValid)response.ignoreMatch();
+}};
+const c={begin:/\$?\(\(/,
+end:/\)\)/,contains:[baseNumber,e.NUMBER_MODE,t,
+// Rejected mid-word digits are plain; consume the run without resumable rejection carryover.
+{begin:/\d+/,skip:!0,relevance:0}]
 },l=e.SHEBANG({binary:"(fish|bash|zsh|sh|csh|ksh|tcsh|dash|scsh)",relevance:10
-}),d={className:"function",begin:/\w[\w\d_]*\s*\(\s*\)\s*\{/,returnBegin:!0,
+}),d={className:"function",begin:/\b\w[\w\d_]*\s*\(\s*\)\s*\{/,returnBegin:!0,
 contains:[e.inherit(e.TITLE_MODE,{begin:/\w[\w\d_]*/})],relevance:0};return{
 name:"Bash",aliases:["sh","zsh"],keywords:{$pattern:/\b[a-z][a-z0-9._-]+\b/,
 keyword:["if","then","else","elif","fi","time","for","while","until","in","do","done","case","esac","coproc","function","select"],
@@ -441,8 +749,8 @@ match:/(-?)\b([\d']+(\.[\d']*)?|\.[\d']+)((ll|LL|l|L)(u|U)?|(u|U)(ll|LL|l|L)?|f|
 match:/(-?)\b(0[xX][a-fA-F0-9]+(?:'[a-fA-F0-9]+)*(?:\.[a-fA-F0-9]*(?:'[a-fA-F0-9]*)*)?(?:[pP][-+]?[0-9]+)?(l|L)?(u|U)?)/
 },{match:/(-?)\b\d+(?:'\d+)*(?:\.\d*(?:'\d*)*)?(?:[eE][-+]?\d+)?/}],relevance:0
 },l={scope:"meta",begin:/#\s*include\b/,end:/$/,keywords:{keyword:"include"},
-contains:[{begin:/\\\n/},o,{scope:"string",begin:/<.*?>/
-},t,e.C_BLOCK_COMMENT_MODE]},d={className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
+contains:[{begin:/\\\n/},o,...includeAngleModes(false)
+,t,e.C_BLOCK_COMMENT_MODE]},d={className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
 keywords:{
 keyword:"if else elif endif define undef warning error line pragma _Pragma ifdef ifndef elifdef elifndef include"
 },contains:[{begin:/\\\n/,relevance:0},e.inherit(o,{className:"string"
@@ -481,8 +789,8 @@ begin:"[+-]?(?:(?:\\b[0-9](?:'?[0-9])*\\.(?:[0-9](?:'?[0-9])*)?|\\.[0-9](?:'?[0-
 },{
 begin:"[+-]?\\b(?:0[Bb][01](?:'?[01])*|0[Xx][0-9A-Fa-f](?:'?[0-9A-Fa-f])*|0(?:'?[0-7])*|[1-9](?:'?[0-9])*)(?:[Uu](?:LL?|ll?)|[Uu][Zz]?|(?:LL?|ll?)[Uu]?|[Zz][Uu]|)"
 }],relevance:0},l=[{scope:"meta",begin:/#\s*include\b/,end:/$/,keywords:{
-keyword:"include"},contains:[{begin:/\\\n/},o,{scope:"string",begin:/<.*?>/
-},t,e.C_BLOCK_COMMENT_MODE]},{className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
+keyword:"include"},contains:[{begin:/\\\n/},o,...includeAngleModes(false)
+,t,e.C_BLOCK_COMMENT_MODE]},{className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
 keywords:{
 keyword:"if else elif endif define undef warning error line pragma _Pragma ifdef ifndef include"
 },contains:[{begin:/\\\n/,relevance:0},e.inherit(o,{className:"string"
@@ -515,7 +823,41 @@ contains:[].concat(_,h,m,p,[...l,{
 begin:"\\b(deque|list|queue|priority_queue|pair|stack|vector|map|set|bitset|multiset|multimap|unordered_map|unordered_set|unordered_multiset|unordered_multimap|array|tuple|optional|variant|function|flat_map|flat_set)\\s*<(?!<)",
 end:">",keywords:b,contains:["self",s]},{begin:e.IDENT_RE+"::",keywords:b},{
 match:[/\b(?:enum(?:\s+(?:class|struct))?|class|struct|union)/,/\s+/,/\w+/],
-className:{1:"keyword",3:"title.class"}}])}},grmr_csharp:e=>{const n={
+className:{1:"keyword",3:"title.class"}}])}},grmr_csharp:e=>{
+function ownRaw(rule){
+const raw=rule.variants[0],shape=Object.assign({},rule,{variants:null},raw);
+shape.scope=shape.className;delete shape.className;
+let cachedInput,cachedFlags,ends,points;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const next=new Uint32Array(input.length),close=[];
+const count=flags.includes("u")?new Uint32Array(input.length+1):null;
+if(count)for(let i=0;i<input.length;i++){
+const c=input.charCodeAt(i),p=input.charCodeAt(i-1);
+count[i+1]=count[i]+(c>=56320&&c<=57343&&p>=55296&&p<=56319?0:1);
+}
+for(let i=input.length-1;i>=0;){
+const c=input.charCodeAt(i);
+if(c===34){
+const end=i+1;while(i>=0&&input.charCodeAt(i)===34)i--;
+const start=i+1,width=end-start;
+for(let w=3;w<=width;w++)if(close[w]!==undefined)next[end-w]=close[w]+w;
+for(let w=3;w<=width;w++)close[w]=start;
+}else{if(!flags.includes("s")&&(c===13||c===8232||c===8233))close.length=0;i--;}
+}
+cachedFlags=flags;ends=next;points=count;
+}
+cachedInput=input;
+const end=ends[at];if(!end)return null;
+let begin=at;while(input.charCodeAt(begin)===34)begin++;
+const width=begin-at,stop=end-width,body=points?points[stop]-points[begin]:stop-begin;
+// Fixed widths recover native captures on the original input without retrying backreferences.
+const recovery=RegExp('"""("{'+(width-3)+'})(?!")'+(body?'[\\s\\S]{'+(body-1)+'}([\\s\\S])':'([\\s\\S]){0}')+'"{'+width+'}',flags+"y");
+recovery.lastIndex=at;return recovery.exec(input);
+};
+ownedRecognizers.set(rule,{shape,select,selector:'"""()()',captures:2});return rule;
+}
+const n={
 keyword:["abstract","as","base","break","case","catch","class","const","continue","do","else","event","explicit","extern","finally","fixed","for","foreach","goto","if","implicit","in","interface","internal","is","lock","namespace","new","operator","out","override","params","private","protected","public","readonly","record","ref","return","scoped","sealed","sizeof","stackalloc","static","struct","switch","this","throw","try","typeof","unchecked","unsafe","using","virtual","void","volatile","while"].concat(["add","alias","and","ascending","args","async","await","by","descending","dynamic","equals","file","from","get","global","group","init","into","join","let","nameof","not","notnull","on","or","orderby","partial","record","remove","required","scoped","select","set","unmanaged","value|0","var","when","where","with","yield"]),
 built_in:["bool","byte","char","decimal","delegate","double","dynamic","enum","float","int","long","nint","nuint","object","sbyte","short","string","ulong","uint","ushort"],
 literal:["default","false","null","true"]},t=e.inherit(e.TITLE_MODE,{
@@ -532,9 +874,9 @@ begin:/\{\{/},{begin:/\}\}/},{begin:'""'},c]},u=e.inherit(g,{illegal:/\n/,
 contains:[{begin:/\{\{/},{begin:/\}\}/},{begin:'""'},l]})
 ;c.contains=[g,d,s,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,r,e.C_BLOCK_COMMENT_MODE],
 l.contains=[u,d,o,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,r,e.inherit(e.C_BLOCK_COMMENT_MODE,{
-illegal:/\n/})];const b={variants:[{className:"string",
+illegal:/\n/})];const b=ownRaw({variants:[{className:"string",
 begin:/"""("*)(?!")(.|\n)*?"""\1/,relevance:1
-},g,d,s,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE]},m={begin:"<",end:">",
+},g,d,s,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE]}),m={begin:"<",end:">",
 contains:[{beginKeywords:"in out"},t]
 },p=e.IDENT_RE+"(<"+e.IDENT_RE+"(\\s*,\\s*"+e.IDENT_RE+")*>)?(\\[\\])?",_={
 begin:"@"+e.IDENT_RE,relevance:0};return{name:"C#",aliases:["cs","c#"],
@@ -555,7 +897,7 @@ begin:"^\\s*\\[(?=[\\w])",excludeBegin:!0,end:"\\]",excludeEnd:!0,contains:[{
 className:"string",begin:/"/,end:/"/}]},{
 beginKeywords:"new return throw await else",relevance:0},{className:"function",
 begin:"("+p+"\\s+)+"+e.IDENT_RE+"\\s*(<[^=]+>\\s*)?\\(",returnBegin:!0,
-end:/\s*[{;=]/,excludeEnd:!0,keywords:n,contains:[{
+end:/\s+[{;=]?|[{;=]/,"on:end":csharpFunctionEnd(),excludeEnd:!0,keywords:n,contains:[{
 beginKeywords:"public private protected static internal protected abstract async extern override unsafe virtual new sealed partial",
 relevance:0},{begin:e.IDENT_RE+"\\s*(<[^=]+>\\s*)?\\(",returnBegin:!0,
 contains:[e.TITLE_MODE,m],relevance:0},{match:/\(\)/},{className:"params",
@@ -579,7 +921,7 @@ excludeEnd:!0}]},t.FUNCTION_DISPATCH]},{begin:n.lookahead(/@/),end:"[{;]",
 relevance:0,illegal:/:/,contains:[{className:"keyword",begin:/@-?\w[\w]*(-\w+)*/
 },{begin:/\s/,endsWithParent:!0,excludeEnd:!0,relevance:0,keywords:{
 $pattern:/[a-z-]+/,keyword:"and or not only",attribute:Re.join(" ")},contains:[{
-begin:/[a-z-]+(?=:)/,className:"attribute"},...a,t.CSS_NUMBER_MODE]}]},{
+variants:[{begin:/[a-z-]/,end:/(?=[^a-z-]|$)/,"on:begin":cssIdentifier(":"),className:"attribute"},{begin:/[a-z-]/,skip:!0}]},...a,t.CSS_NUMBER_MODE]}]},{
 className:"selector-tag",begin:"\\b("+Te.join("|")+")\\b"}]}},grmr_diff:e=>{
 const n=e.regex;return{name:"Diff",aliases:["patch"],contains:[{
 className:"meta",relevance:10,
@@ -606,19 +948,51 @@ match:/-?\.\d(_?\d)*([eE][+-]?\d(_?\d)*)?i?/,relevance:0},{
 match:/-?\b\d(_?\d)*(\.(\d(_?\d)*)?)?([eE][+-]?\d(_?\d)*)?i?/,relevance:0}]},{
 begin:/:=/},{className:"function",beginKeywords:"func",end:"\\s*(\\{|$)",
 excludeEnd:!0,contains:[e.TITLE_MODE,{className:"params",begin:/\(/,end:/\)/,
-endsParent:!0,keywords:n,illegal:/["']/}]}]}},grmr_graphql:e=>{const n=e.regex
-;return{name:"GraphQL",aliases:["gql"],case_insensitive:!0,disableAutodetect:!1,
+endsParent:!0,keywords:n,illegal:/["']/}]}]}},grmr_graphql:e=>{const n=e.regex;
+let input,indexFlags,identifierEnd,nextNonspace;
+function index(value,flags){
+if(input!==value||indexFlags!==flags){
+const identifier=RegExp("[_0-9A-Za-z]",flags),space=RegExp("\\s",flags);
+identifierEnd=new Uint32Array(value.length+1);
+nextNonspace=new Uint32Array(value.length+1);
+nextNonspace[value.length]=value.length;
+for(let at=value.length-1;at>=0;at--){
+identifierEnd[at]=identifier.exec(value[at])?(identifierEnd[at+1]||at+1):0;
+nextNonspace[at]=space.exec(value[at])?nextNonspace[at+1]:at;
+}
+indexFlags=flags;
+}
+input=value;
+}
+return{name:"GraphQL",aliases:["gql"],case_insensitive:!0,disableAutodetect:!1,
 keywords:{
 keyword:["query","mutation","subscription","type","input","schema","directive","interface","union","scalar","fragment","enum","on"],
 literal:["true","false","null"]},
 contains:[e.HASH_COMMENT_MODE,e.QUOTE_STRING_MODE,e.NUMBER_MODE,{
 scope:"punctuation",match:/[.]{3}/,relevance:0},{scope:"punctuation",
 begin:/[\!\(\)\:\=\[\]\{\|\}]{1}/,relevance:0},{scope:"variable",begin:/\$/,
-end:/\W/,excludeEnd:!0,relevance:0},{scope:"meta",match:/@\w+/,excludeEnd:!0},{
+end:/\W/,excludeEnd:!0,relevance:0},{scope:"meta",match:/@\w+/,excludeEnd:!0},ownRecognizer({
 scope:"symbol",begin:n.concat(/[_A-Za-z][_0-9A-Za-z]*/,n.lookahead(/\s*:/)),
-relevance:0}],illegal:[/[;<']/,/BEGIN/]}},grmr_ini:e=>{const n=e.regex,t={
-className:"number",relevance:0,variants:[{begin:/([+-]+)?[\d]+_[\d_]+/},{
-begin:e.NUMBER_RE}]},a=e.COMMENT();a.variants=[{begin:/;/,end:/$/},{begin:/#/,
+relevance:0},(value,at,flags)=>{index(value,flags);const end=identifierEnd[at];
+return end&&value[nextNonspace[end]]===":"?end:0;})],illegal:[/[;<']/,/BEGIN/]}},grmr_ini:e=>{function number(rule){
+const source=rule.begin.source;let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const next=new Uint8Array(input.length+2),digit=i=>{const c=input.charCodeAt(i);return c>=48&&c<=57;};
+for(let i=input.length-1;i>=0;i--){
+const c=input[i];
+next[i]=digit(i)?(input[i+1]==="_"&&(digit(i+2)||input[i+2]==="_")||digit(i+1)&&next[i+1]):(c==="+"||c==="-")&&next[i+1];
+}
+eligible=next;cachedFlags=flags;full=RegExp(source,flags+"y");
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+return ownMode(rule,{select,selector:"[+0-9-]()",captures:1});
+}
+const n=e.regex,t=ownMode({
+className:"number",relevance:0,variants:[number({begin:/([+-]+)?[\d]+_[\d_]+/}),{
+begin:e.NUMBER_RE}]}),a=e.COMMENT();a.variants=[{begin:/;/,end:/$/},{begin:/#/,
 end:/$/}];const i={className:"variable",variants:[{begin:/\$[\w\d"][\w\d_]*/},{
 begin:/\$\{(.*?)\}/}]},r={className:"literal",
 begin:/\bon|off|true|false|yes|no\b/},s={className:"string",
@@ -627,9 +1001,9 @@ begin:'"""',end:'"""',relevance:10},{begin:'"',end:'"'},{begin:"'",end:"'"}]
 },o={begin:/\[/,end:/\]/,contains:[a,r,i,s,t,"self"],relevance:0
 },c=n.either(/[A-Za-z0-9_-]+/,/"(\\"|[^"])*"/,/'[^']*'/);return{
 name:"TOML, also INI",aliases:["toml"],case_insensitive:!0,illegal:/\S/,
-contains:[a,{className:"section",begin:/\[+/,end:/\]+/},{
+contains:[a,{className:"section",begin:/\[+/,end:/\]+/},ownIni({
 begin:n.concat(c,"(\\s*\\.\\s*",c,")*",n.lookahead(/\s*=\s*[^#\s]/)),
-className:"attr",starts:{end:/$/,contains:[a,o,r,i,s,t]}}]}},grmr_java:e=>{
+className:"attr",starts:{end:/$/,contains:[a,o,r,i,s,t]}})]}},grmr_java:e=>{
 const n=e.regex,t="[\xc0-\u02b8a-zA-Z_$][\xc0-\u02b8a-zA-Z_$0-9]*",a="(?:(?:\\s*\\[\\s*])+)?",i=t+"<@@@>"+a,r="(?:\\?(?:\\s+(?:extends|super)\\s+"+i+")?|"+i+")",s=Ue("(?:\\s*<\\s*"+r+"(?:\\s*,\\s*"+r+")*\\s*>)?",/<@@@>/g,2),o={
 keyword:["synchronized","abstract","private","var","static","if","const ","for","while","strictfp","finally","protected","import","native","final","void","enum","else","break","transient","catch","instanceof","volatile","case","assert","package","default","public","try","switch","continue","throws","protected","public","private","module","requires","exports","do","sealed","yield","permits","goto","when"],
 literal:["false","true","null"],
@@ -637,24 +1011,54 @@ type:["char","boolean","long","float","int","byte","short","double"],
 built_in:["super","this"]},c={className:"meta",begin:"@"+t,contains:[{
 begin:/\(/,end:/\)/,contains:["self"]}]},l={className:"params",begin:/\(/,
 end:/\)/,keywords:o,relevance:0,contains:[e.C_BLOCK_COMMENT_MODE],endsParent:!0}
-;return{name:"Java",aliases:["jsp"],keywords:o,illegal:/<\/|#/,
-contains:[e.COMMENT("/\\*\\*","\\*/",{relevance:0,contains:[{begin:/\w+@/,
-relevance:0},{className:"doctag",begin:"@[A-Za-z]+"}]}),{
+;const d=e.COMMENT("/\\*\\*","\\*/",{relevance:0,contains:[{begin:/\w+@/,
+relevance:0},{className:"doctag",begin:"@[A-Za-z]+"}]});
+// Buffer failed words without consuming interior COMMENT markers or changing the successful word@ guard.
+d.contains.push({begin:n.concat('(?:(?!',e.C_BLOCK_COMMENT_MODE.contains[0].begin,')\\w)+'),skip:!0,relevance:0});
+const javaRules=new WeakMap;
+function ownJava(rule){
+const shape=Object.assign({},rule);R(shape);Z(shape);
+const source=shape.begin,captures=p(source);
+let input,indexFlags,full,tail,rejectedStart=-1,rejectedEnd=-1;
+const select=(value,at,flags)=>{
+if(value!==input||flags!==indexFlags){
+full=RegExp(source,flags+"y");tail=RegExp("[\\xc0-\\u02b8a-zA-Z_$0-9]+",flags+"y");
+indexFlags=flags;rejectedStart=rejectedEnd=-1;
+}
+input=value;if(at>=rejectedStart&&at<rejectedEnd)return null;
+full.lastIndex=at;const match=full.exec(value);
+// A failed type suffix is identical at every later start in this identifier run.
+if(match===null){tail.lastIndex=at;const run=tail.exec(value);rejectedStart=at;rejectedEnd=at+(run?run[0].length:1);}
+return match;
+};
+javaRules.set(rule,{shape,select,selector:"[\\xc0-\\u02b8a-zA-Z_$]"+"()".repeat(captures),captures});return rule;
+}
+function javaOwnedExtension(rule){
+const entry=javaRules.get(rule);if(!entry)return;
+const data=(actual,expected)=>{
+if(Object.getPrototypeOf(actual)!==Object.getPrototypeOf(expected)||Reflect.ownKeys(actual).length!==Reflect.ownKeys(expected).length)return false;
+return Reflect.ownKeys(expected).every(key=>{const a=Object.getOwnPropertyDescriptor(actual,key),b=Object.getOwnPropertyDescriptor(expected,key);
+return a&&Object.prototype.hasOwnProperty.call(a,"value")&&(a.value===b.value||(key==="beginScope"||key==="_emit")&&a.value&&typeof a.value==="object"&&data(a.value,b.value));});
+};
+if(data(rule,entry.shape))ownedRecognizers.set(rule,{...entry,shape:Object.assign({},rule)});
+}
+return{name:"Java",aliases:["jsp"],compilerExtensions:[javaOwnedExtension],keywords:o,illegal:/<\/|#/,
+contains:[d,{
 begin:/import java\.[a-z]+\./,keywords:"import",relevance:2
 },e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE,{begin:/"""/,end:/"""/,
 className:"string",contains:[e.BACKSLASH_ESCAPE]
 },e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,{
 match:[/\b(?:class|interface|enum|extends|implements|new)/,/\s+/,t],className:{
 1:"keyword",3:"title.class"}},{match:/non-sealed/,scope:"keyword"},{
-beginKeywords:"new throw return else yield assert",relevance:0},{
+beginKeywords:"new throw return else yield assert",relevance:0},ownJava({
 begin:[t,n.concat(s,a,/\s+/),t,a,/\s*/,/=(?!=)/],className:{1:"type",
-3:"variable",6:"operator"}},{begin:[/record/,/\s+/,t],className:{1:"keyword",
-3:"title.class"},contains:[l,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{
+3:"variable",6:"operator"}}),{begin:[/record/,/\s+/,t],className:{1:"keyword",
+3:"title.class"},contains:[l,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},ownJava({
 begin:[t,n.concat(s,a,/\s+/),t,/\s*(?=\()/],className:{1:"type",
 3:"title.function"},keywords:o,contains:[{className:"params",begin:/\(/,
 end:/\)/,keywords:o,relevance:0,
 contains:[c,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,je,e.C_BLOCK_COMMENT_MODE]
-},e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},je,c]}},grmr_javascript:ge,
+},e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]}),je,c]}},grmr_javascript:ge,
 grmr_json:e=>{const n=["true","false","null"],t={scope:"literal",
 beginKeywords:n.join(" ")};return{name:"JSON",aliases:["jsonc","json5"],
 keywords:{literal:n},contains:[{className:"attr",
@@ -706,7 +1110,9 @@ relevance:0}
 begin:"(url|data-uri)\\(",starts:{className:"string",end:"[\\)\\n]",
 excludeEnd:!0}
 },n.UNICODE_RANGE,n.HEXCOLOR,d,c("variable","@@?"+a,10),c("variable","@\\{"+a+"\\}"),c("built_in","~?`[^`]*?`"),{
-className:"attribute",begin:a+"\\s*:",end:":",returnBegin:!0,excludeEnd:!0
+className:"attribute",begin:/[\w-]/,"on:begin":cssIdentifier((e,n)=>{
+while(/\s/.test(e[n]))n++;return e[n]===":"}),
+end:":",returnBegin:!0,excludeEnd:!0
 },n.IMPORTANT,{beginKeywords:"and not"},n.FUNCTION_DISPATCH);const g=s.concat({
 begin:/\{/,end:/\}/,contains:r}),u={beginKeywords:"when",endsWithParent:!0,
 contains:[{beginKeywords:"and not"}].concat(s)},b={begin:i+"\\s*:",
@@ -752,13 +1158,49 @@ name:"Makefile",aliases:["mk","mak","make"],keywords:{$pattern:/[\w-]+/,
 keyword:"define endef undefine ifdef ifndef ifeq ifneq else endif include -include sinclude override export unexport private vpath"
 },contains:[e.HASH_COMMENT_MODE,n,t,a,i,{className:"meta",begin:/^\.PHONY:/,
 end:/$/,keywords:{$pattern:/[\.\w]+/,keyword:".PHONY"}},r]}},grmr_markdown:e=>{
+// Index the original five lookaheads once, without narrowing their permissive labels.
+let linkInput,linkMasks;
+function indexLinks(input){
+linkInput=input;linkMasks=new Uint8Array(input.length);
+let bracket=-1,paren=-1;
+const next=[-1,-1,-1,-1,-1],second=next.slice(),
+popular=/(?:(?:data|javascript|mailto):|(?:http|ftp)s?:\/\/)/y,
+scheme=/[A-Za-z][A-Za-z0-9+.-]*:\/\//y;
+for(let pos=input.length-1;pos>=0;pos--){
+const ch=input[pos];
+if(ch==="\n"||ch==="\r"||ch==="\u2028"||ch==="\u2029"){
+bracket=paren=-1;next.fill(-1);second.fill(-1);continue;}
+if(ch==="]"){
+let mask=0;
+if(input[pos+1]==="["&&bracket>pos+1)mask|=1;
+if(input[pos+1]==="("&&paren>pos+1){
+mask|=16;
+popular.lastIndex=scheme.lastIndex=pos+2;
+if(popular.test(input))mask|=2;
+if(scheme.test(input))mask|=4;
+if("./?&#".indexOf(input[pos+2])!==-1)mask|=8;
+}
+for(let v=0;v<5;v++)if(mask&(1<<v)){second[v]=next[v];next[v]=pos;}
+bracket=pos;
+}else if(ch===")")paren=pos;
+else if(ch==="["){
+let mask=0;
+for(let v=0;v<5;v++){
+const candidate=v===4||next[v]!==pos+1?next[v]:second[v];
+if(candidate>=pos+(v===4?1:2))mask|=1<<v;
+}
+linkMasks[pos]=mask;
+}
+}
+}
 const n={begin:/<\/?[A-Za-z_]/,end:">",subLanguage:"xml",relevance:0},t={
-variants:[{begin:/\[.+?\]\[.*?\]/,relevance:0},{
-begin:/\[.+?\]\(((data|javascript|mailto):|(?:http|ftp)s?:\/\/).*?\)/,
-relevance:2},{
-begin:e.regex.concat(/\[.+?\]\(/,/[A-Za-z][A-Za-z0-9+.-]*/,/:\/\/.*?\)/),
-relevance:2},{begin:/\[.+?\]\([./?&#].*?\)/,relevance:1},{
-begin:/\[.*?\]\(.*?\)/,relevance:0}],returnBegin:!0,contains:[{match:/\[(?=\])/
+variants:[0,2,2,1,0].map((relevance,v)=>({begin:/\[/,relevance,
+"on:begin":(match,response)=>{
+if(linkInput!==match.input)indexLinks(match.input);
+// Equal decoded strings still need this invocation's reference for later callbacks.
+linkInput=match.input;
+if(!(linkMasks[match.index]&(1<<v)))response.ignoreMatch();
+}})),returnBegin:!0,contains:[{match:/\[(?=\])/
 },{className:"string",relevance:0,begin:"\\[",end:"\\]",excludeBegin:!0,
 returnEnd:!0},{className:"link",relevance:0,begin:"\\]\\(",end:"\\)",
 excludeBegin:!0,excludeEnd:!0},{className:"symbol",relevance:0,begin:"\\]\\[",
@@ -767,7 +1209,9 @@ variants:[{begin:/_{2}(?!\s)/,end:/_{2}/},{begin:/\*{2}(?!\s)/,end:/\*{2}/}]
 },i={className:"emphasis",contains:[],variants:[{begin:/\*(?![*\s])/,end:/\*/},{
 begin:/_(?![_\s])/,end:/_/,relevance:0}]},r=e.inherit(a,{contains:[]
 }),s=e.inherit(i,{contains:[]});a.contains.push(s),i.contains.push(r)
-;let o=[n,t];return[a,i,r,s].forEach(e=>{e.contains=e.contains.concat(o)
+// Consume rejected brackets after existing rules, resetting the resumable matcher.
+;const bracketFallback={match:/\[/,relevance:0};
+let o=[n,t,bracketFallback];return[a,i,r,s].forEach(e=>{e.contains=e.contains.concat(o)
 }),o=o.concat(a,i),{name:"Markdown",aliases:["md","mkdown","mkd"],contains:[{
 className:"section",variants:[{begin:"^#{1,6}",end:"$",contains:o},{
 begin:"(?=^.+?\\n[=-]{2,}$)",contains:[{begin:"^[=-]*$"},{begin:"^",end:"\\n",
@@ -781,7 +1225,7 @@ contains:[{begin:"^( {4}|\\t)",end:"(\\n)$"}],relevance:0}]},t,{
 begin:/^\[[^\n]+\]:/,returnBegin:!0,contains:[{className:"symbol",begin:/\[/,
 end:/\]/,excludeBegin:!0,excludeEnd:!0},{className:"link",begin:/:\s*/,end:/$/,
 excludeBegin:!0}]},{scope:"literal",
-match:/&([a-zA-Z0-9]+|#[0-9]{1,7}|#[Xx][0-9a-fA-F]{1,6});/}]}},
+match:/&([a-zA-Z0-9]+|#[0-9]{1,7}|#[Xx][0-9a-fA-F]{1,6});/},bracketFallback]}},
 grmr_objectivec:e=>{const n=/[a-zA-Z@][a-zA-Z0-9_]*/,t={$pattern:n,
 keyword:["@interface","@class","@protocol","@implementation"]};return{
 name:"Objective-C",aliases:["mm","objc","obj-c","obj-c++","objective-c++"],
@@ -798,15 +1242,57 @@ contains:[e.BACKSLASH_ESCAPE]}]},{className:"meta",begin:/#\s*[a-z]+\b/,end:/$/,
 keywords:{
 keyword:"if else elif endif define undef warning error line pragma ifdef ifndef include"
 },contains:[{begin:/\\\n/,relevance:0},e.inherit(e.QUOTE_STRING_MODE,{
-className:"string"}),{className:"string",begin:/<.*?>/,end:/$/,illegal:"\\n"
-},e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{className:"class",
+className:"string"}),...includeAngleModes(true)
+,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{className:"class",
 begin:"("+t.keyword.join("|")+")\\b",end:/(\{|$)/,excludeEnd:!0,keywords:t,
 contains:[e.UNDERSCORE_TITLE_MODE]},{begin:"\\."+e.UNDERSCORE_IDENT_RE,
-relevance:0}]}},grmr_perl:e=>{const n=e.regex,t=/[dualxmsipngr]{0,12}/,a={
+relevance:0}]}},grmr_perl:e=>{
+// Validate optional argument tails once, while the attr mode consumes the full accepted span.
+let attrInput,attrOpens;
+function attrArguments(match){
+const input=match.input;
+if(input!==attrInput){
+attrOpens=new Set;let closing=!1;
+for(let i=input.length-1;i>=0;i--){
+const ch=input[i];
+if(ch==="\n"||ch==="\r"||ch==="\u2028"||ch==="\u2029")closing=!1;
+else if(ch===")")closing=!0;
+else if(ch==="("&&closing)attrOpens.add(i);
+}
+}
+attrInput=input;
+const open=/\s*\(/y;open.lastIndex=match.index+match[0].length;
+return !!open.exec(input)&&attrOpens.has(open.lastIndex-1);
+}
+// Index the first eligible close before a JS dot-line boundary, and each whitespace run.
+let declarationInput,declarationWhitespace,declarationCloses;
+function declarationEnd(match){
+const input=match.input;
+if(input!==declarationInput){
+declarationWhitespace=new Uint32Array(input.length+1);
+declarationWhitespace[input.length]=input.length;
+declarationCloses=new Uint32Array(input.length+1);
+let close=0;
+for(let i=input.length-1;i>=0;i--){
+const ch=input[i];
+declarationWhitespace[i]=/\s/.test(ch)?declarationWhitespace[i+1]:i;
+if(ch==="\n"||ch==="\r"||ch==="\u2028"||ch==="\u2029")close=0;
+else if(ch===")"&&(input[i+1]===";"||input[i+1]==="{"))close=i+2;
+declarationCloses[i]=close;
+}
+}
+declarationInput=input;
+const at=match.index,ch=input[at],open=declarationWhitespace[at];
+return ch===";"||ch==="{"?at+1:input[open]==="("?declarationCloses[open]:0;
+}
+const n=e.regex,t=/[dualxmsipngr]{0,12}/,a={
 $pattern:/[\w.]+/,
 keyword:"abs accept alarm and atan2 bind binmode bless break caller chdir chmod chomp chop chown chr chroot class close closedir connect continue cos crypt dbmclose dbmopen defined delete die do dump each else elsif endgrent endhostent endnetent endprotoent endpwent endservent eof eval exec exists exit exp fcntl field fileno flock for foreach fork format formline getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname gethostent getlogin getnetbyaddr getnetbyname getnetent getpeername getpgrp getpriority getprotobyname getprotobynumber getprotoent getpwent getpwnam getpwuid getservbyname getservbyport getservent getsockname getsockopt given glob gmtime goto grep gt hex if index int ioctl join keys kill last lc lcfirst length link listen local localtime log lstat lt ma map method mkdir msgctl msgget msgrcv msgsnd my ne next no not oct open opendir or ord our pack package pipe pop pos print printf prototype push q|0 qq quotemeta qw qx rand read readdir readline readlink readpipe recv redo ref rename require reset return reverse rewinddir rindex rmdir say scalar seek seekdir select semctl semget semop send setgrent sethostent setnetent setpgrp setpriority setprotoent setpwent setservent setsockopt shift shmctl shmget shmread shmwrite shutdown sin sleep socket socketpair sort splice split sprintf sqrt srand stat state study sub substr symlink syscall sysopen sysread sysseek system syswrite tell telldir tie tied time times tr truncate uc ucfirst umask undef unless unlink unpack unshift untie until use utime values vec wait waitpid wantarray warn when while write x|0 xor y|0"
 },i={className:"subst",begin:"[$@]\\{",end:"\\}",keywords:a},r={begin:/->\{/,
-end:/\}/},s={scope:"attr",match:/\s+:\s*\w+(\s*\(.*?\))?/},o={scope:"variable",
+end:/\}/},s={scope:"attr",variants:[{
+begin:/\s+:\s*\w+/,end:/\)/,"on:begin":(match,response)=>{
+if(!attrArguments(match))response.ignoreMatch();
+}},{match:/\s+:\s*\w+/}]},o={scope:"variable",
 variants:[{begin:/\$\d/},{
 begin:n.concat(/[$%@](?!")(\^\w\b|#\w+(::\w+)*|\{\w+\}|\w+(::\w*)*)/,"(?![A-Za-z])(?![@$%])")
 },{begin:/[$%@](?!")[^\s\w{=]|\$=/,relevance:0}],contains:[s]},c={
@@ -835,9 +1321,14 @@ className:"regexp",variants:[{begin:/(m|qr)\/\//,relevance:0},{
 begin:u("(?:m|qr)?",/\//,/\//)},{begin:u("m|qr",n.either(...d,{capture:!0
 }),/\1/)},{begin:u("m|qr",/\(/,/\)/)},{begin:u("m|qr",/\[/,/\]/)},{
 begin:u("m|qr",/\{/,/\}/)}]}]},{className:"function",beginKeywords:"sub method",
-end:"(\\s*\\(.*?\\))?[;{]",excludeEnd:!0,relevance:5,contains:[e.TITLE_MODE,s]
+end:/\s+|[({;]/,excludeEnd:!0,relevance:5,"on:end":(match,response)=>{
+const end=declarationEnd(match);
+if(end)response._endLexeme=match.input.slice(match.index,end);else response.ignoreMatch();
+},contains:[e.TITLE_MODE,s,{match:/\s+/,skip:!0,relevance:0,"on:begin":(match,response)=>{
+if(declarationEnd(match))response.ignoreMatch();
+}}]
 },{className:"class",beginKeywords:"class",end:"[;{]",excludeEnd:!0,relevance:5,
-contains:[e.TITLE_MODE,s,c]},{begin:"-\\w\\b",relevance:0},{begin:"^__DATA__$",
+contains:[e.TITLE_MODE,s,c,{match:/\s+/,skip:!0,relevance:0}]},{begin:"-\\w\\b",relevance:0},{begin:"^__DATA__$",
 end:"^__END__$",subLanguage:"mojolicious",contains:[{begin:"^@@.*",end:"$",
 className:"comment"}]}];return i.contains=b,r.contains=b,{name:"Perl",
 aliases:["pl","pm"],keywords:a,contains:b}},grmr_php:e=>{
@@ -846,11 +1337,11 @@ scope:"variable",match:"\\$+"+a},o={scope:"subst",variants:[{begin:/\$\w+/},{
 begin:/\{\$/,end:/\}/}]},c=e.inherit(e.APOS_STRING_MODE,{illegal:null
 }),l="[ \t\n]",d={scope:"string",variants:[e.inherit(e.QUOTE_STRING_MODE,{
 illegal:null,contains:e.QUOTE_STRING_MODE.contains.concat(o)}),c,{
-begin:/<<<[ \t]*(?:(\w+)|"(\w+)")\n/,end:/[ \t]*(\w+)\b/,
+begin:/<<<[ \t]*(?:(\w+)|"(\w+)")\n/,end:/(\w+)/,
 contains:e.QUOTE_STRING_MODE.contains.concat(o),"on:begin":(e,n)=>{
 n.data._beginMatch=e[1]||e[2]},"on:end":(e,n)=>{
 n.data._beginMatch!==e[1]&&n.ignoreMatch()}},e.END_SAME_AS_BEGIN({
-begin:/<<<[ \t]*'(\w+)'\n/,end:/[ \t]*(\w+)\b/})]},g={scope:"number",variants:[{
+begin:/<<<[ \t]*'(\w+)'\n/,end:/(\w+)/})]},g={scope:"number",variants:[{
 begin:"\\b0[bB][01]+(?:_[01]+)*\\b"},{begin:"\\b0[oO][0-7]+(?:_[0-7]+)*\\b"},{
 begin:"\\b0[xX][\\da-fA-F]+(?:_[\\da-fA-F]+)*\\b"},{
 begin:"(?:\\b\\d+(?:_\\d+)*(\\.(?:\\d+(?:_\\d+)*))?|\\B\\.\\d+)(?:[eE][+-]?\\d+)?"
@@ -878,7 +1369,7 @@ begin:n.concat(/#\[\s*\\?/,n.either(i,r)),beginScope:"meta",end:/]/,
 endScope:"meta",keywords:{literal:u,keyword:["new","array"]},contains:[{
 begin:/\[/,end:/]/,keywords:{literal:u,keyword:["new","array"]},
 contains:["self",...N]},...N,{scope:"meta",variants:[{match:i},{match:r}]}]}
-;return{case_insensitive:!1,keywords:p,
+;for(const [wrapper,leaves,slot] of [[h,h.variants,3],[E,E.variants.slice(2),0],[k.contains[k.contains.length-1],k.contains[k.contains.length-1].variants.slice(0,1),undefined]]){for(const rule of leaves)ownPhp(rule,i,slot);ownMode(wrapper);}ownPhp(k,i,-1);return{case_insensitive:!1,keywords:p,
 contains:[k,e.HASH_COMMENT_MODE,e.COMMENT("//","$"),e.COMMENT("/\\*","\\*/",{
 contains:[{scope:"doctag",match:"@[A-Za-z]+"}]}),{match:/__halt_compiler\(\);/,
 keywords:"__halt_compiler",starts:{scope:"comment",end:e.MATCH_NOTHING_RE,
@@ -972,6 +1463,17 @@ match:[/%[^%]*%/,a]},{scope:{1:"punctuation",2:"number"},match:[r,a]},{scope:{
 match:[t,/\s+/,/<-/,/\s+/]},{scope:"operator",relevance:0,variants:[{match:i},{
 match:/%[^%]*%/}]},{scope:"punctuation",relevance:0,match:r},{begin:"`",end:"`",
 contains:[{begin:/\\./}]}]}},grmr_ruby:e=>{
+// Retain one input only; eligibility depends on the last matching line, not a suffix scan per opener.
+let heredocInput,heredocEnds;
+function heredocAllowed(input,index){
+if(input!==heredocInput){
+heredocEnds=new Map;const line=/\n[^\S\n]*(\w+)\b/g;let match;
+while((match=line.exec(input)))heredocEnds.set(match[1],match.index);
+}
+heredocInput=input;
+const word=/\w+(?=\W)/y;word.lastIndex=index;const match=word.exec(input);
+return !!match&&heredocEnds.get(match[0])>=word.lastIndex;
+}
 const n=e.regex,t="([a-zA-Z_]\\w*[!?=]?|[-+~]@|<<|>>|=~|===?|<=>|[<>]=?|\\*\\*|[-/+%^&*~`|]|\\[\\]=?)",a=n.either(/\b([A-Z]+[a-z0-9]+)+/,/\b([A-Z]+[a-z0-9]+)+[A-Z]+/),i=n.concat(a,/(::\w+)*/),r={
 "variable.constant":["__FILE__","__LINE__","__ENCODING__"],
 "variable.language":["self","super"],
@@ -990,7 +1492,9 @@ begin:/%[qQwWx]?\|/,end:/\|/},{begin:/\B\?(\\\d{1,3})/},{
 begin:/\B\?(\\x[A-Fa-f0-9]{1,2})/},{begin:/\B\?(\\u\{?[A-Fa-f0-9]{1,6}\}?)/},{
 begin:/\B\?(\\M-\\C-|\\M-\\c|\\c\\M-|\\M-|\\C-\\M-)[\x20-\x7e]/},{
 begin:/\B\?\\(c|C-)[\x20-\x7e]/},{begin:/\B\?\\?\S/},{
-begin:n.concat(/<<[-~]?'?/,n.lookahead(/(\w+)(?=\W)[^\n]*\n(?:[^\n]*\n)*?\s*\1\b/)),
+begin:/<<[-~]?'?/,"on:begin":(match,response)=>{
+if(!heredocAllowed(match.input,match.index+match[0].length))response.ignoreMatch();
+},
 contains:[e.END_SAME_AS_BEGIN({begin:/(\w+)/,end:/(\w+)/,
 contains:[e.BACKSLASH_ESCAPE,l]})]}]},g="[0-9](_?[0-9])*",u={className:"number",
 relevance:0,variants:[{
@@ -1067,12 +1571,17 @@ contains:[n.BLOCK_COMMENT,r,n.HEXCOLOR,n.CSS_NUMBER_MODE,n.UNICODE_RANGE,e.QUOTE
 },{begin:"@(page|font-face)",keywords:{$pattern:i,keyword:"@page @font-face"}},{
 begin:"@",end:"[{;]",returnBegin:!0,keywords:{$pattern:/[a-z-]+/,
 keyword:"and or not only",attribute:Re.join(" ")},contains:[{begin:i,
-className:"keyword"},{begin:/[a-z-]+(?=:)/,className:"attribute"
+className:"keyword"},{variants:[{begin:/[a-z-]/,end:/(?=[^a-z-]|$)/,"on:begin":cssIdentifier(":"),className:"attribute"},{begin:/[a-z-]/,skip:!0}]
 },r,e.QUOTE_STRING_MODE,e.APOS_STRING_MODE,n.HEXCOLOR,n.CSS_NUMBER_MODE]
-},n.FUNCTION_DISPATCH]}},grmr_shell:e=>({name:"Shell Session",
+},n.FUNCTION_DISPATCH]}},grmr_shell:e=>{const n=/[\r\n\u2028\u2029]/,t=/\s/;let a,i;
+return{name:"Shell Session",
 aliases:["console","shellsession"],contains:[{className:"meta.prompt",
-begin:/^\s{0,3}[./~\w\d[\]()@-]*[>%$#][ ]?/,starts:{end:/[^\\](?=\s*$)/,
-subLanguage:"bash"}}]}),grmr_sql:e=>{
+begin:/^\s{0,3}[./~\w\d[\]()@-]*[>%$#][ ]?/,starts:{end:/[^\\]/,
+"on:end":(e,r)=>{
+// Index whitespace-to-line-end once without extending the emitted Bash span.
+if(a!==e.input){a=e.input;i=new Uint8Array(a.length+1);i[a.length]=1;
+for(let e=a.length-1;e>=0;e--)i[e]=n.test(a[e])||t.test(a[e])&&i[e+1]?1:0;}
+a=e.input;i[e.index+1]||r.ignoreMatch();},subLanguage:"bash"}}]};},grmr_sql:e=>{
 const n=e.regex,t=e.COMMENT("--","$"),a=["abs","acos","array_agg","asin","atan","avg","cast","ceil","ceiling","coalesce","corr","cos","cosh","count","covar_pop","covar_samp","cume_dist","dense_rank","deref","element","exp","extract","first_value","floor","json_array","json_arrayagg","json_exists","json_object","json_objectagg","json_query","json_table","json_table_primitive","json_value","lag","last_value","lead","listagg","ln","log","log10","lower","max","min","mod","nth_value","ntile","nullif","percent_rank","percentile_cont","percentile_disc","position","position_regex","power","rank","regr_avgx","regr_avgy","regr_count","regr_intercept","regr_r2","regr_slope","regr_sxx","regr_sxy","regr_syy","row_number","sin","sinh","sqrt","stddev_pop","stddev_samp","substring","substring_regex","sum","tan","tanh","translate","translate_regex","treat","trim","trim_array","unnest","upper","value_of","var_pop","var_samp","width_bucket"],i=a,r=["abs","acos","all","allocate","alter","and","any","are","array","array_agg","array_max_cardinality","as","asensitive","asin","asymmetric","at","atan","atomic","authorization","avg","begin","begin_frame","begin_partition","between","bigint","binary","blob","boolean","both","by","call","called","cardinality","cascaded","case","cast","ceil","ceiling","char","char_length","character","character_length","check","classifier","clob","close","coalesce","collate","collect","column","commit","condition","connect","constraint","contains","convert","copy","corr","corresponding","cos","cosh","count","covar_pop","covar_samp","create","cross","cube","cume_dist","current","current_catalog","current_date","current_default_transform_group","current_path","current_role","current_row","current_schema","current_time","current_timestamp","current_path","current_role","current_transform_group_for_type","current_user","cursor","cycle","date","day","deallocate","dec","decimal","decfloat","declare","default","define","delete","dense_rank","deref","describe","deterministic","disconnect","distinct","double","drop","dynamic","each","element","else","empty","end","end_frame","end_partition","end-exec","equals","escape","every","except","exec","execute","exists","exp","external","extract","false","fetch","filter","first_value","float","floor","for","foreign","frame_row","free","from","full","function","fusion","get","global","grant","group","grouping","groups","having","hold","hour","identity","in","indicator","initial","inner","inout","insensitive","insert","int","integer","intersect","intersection","interval","into","is","join","json_array","json_arrayagg","json_exists","json_object","json_objectagg","json_query","json_table","json_table_primitive","json_value","lag","language","large","last_value","lateral","lead","leading","left","like","like_regex","listagg","ln","local","localtime","localtimestamp","log","log10","lower","match","match_number","match_recognize","matches","max","member","merge","method","min","minute","mod","modifies","module","month","multiset","national","natural","nchar","nclob","new","no","none","normalize","not","nth_value","ntile","null","nullif","numeric","octet_length","occurrences_regex","of","offset","old","omit","on","one","only","open","or","order","out","outer","over","overlaps","overlay","parameter","partition","pattern","per","percent","percent_rank","percentile_cont","percentile_disc","period","portion","position","position_regex","power","precedes","precision","prepare","primary","procedure","ptf","range","rank","reads","real","recursive","ref","references","referencing","regr_avgx","regr_avgy","regr_count","regr_intercept","regr_r2","regr_slope","regr_sxx","regr_sxy","regr_syy","release","result","return","returns","revoke","right","rollback","rollup","row","row_number","rows","running","savepoint","scope","scroll","search","second","seek","select","sensitive","session_user","set","show","similar","sin","sinh","skip","smallint","some","specific","specifictype","sql","sqlexception","sqlstate","sqlwarning","sqrt","start","static","stddev_pop","stddev_samp","submultiset","subset","substring","substring_regex","succeeds","sum","symmetric","system","system_time","system_user","table","tablesample","tan","tanh","then","time","timestamp","timezone_hour","timezone_minute","to","trailing","translate","translate_regex","translation","treat","trigger","trim","trim_array","true","truncate","uescape","union","unique","unknown","unnest","update","upper","user","using","value","values","value_of","var_pop","var_samp","varbinary","varchar","varying","versioning","when","whenever","where","width_bucket","window","with","within","without","year","add","asc","collation","desc","final","first","last","view"].filter(e=>!a.includes(e)),s={
 match:n.concat(/\b/,n.either(...i),/\s*\(/),relevance:0,keywords:{built_in:i}}
 ;function o(e){
@@ -1126,13 +1635,13 @@ match:b(/(AV|CA|CF|CG|CI|CL|CM|CN|CT|MK|MP|MTK|MTL|NS|SCN|SK|UI|WK|XC)/,xe,"+")
 },{className:"type",match:Me,relevance:0},{match:/[?!]+/,relevance:0},{
 match:/\.\.\./,relevance:0},{match:b(/\s+&\s+/,d(Me)),relevance:0}]},D={
 begin:/</,end:/>/,keywords:c,contains:[...a,...l,...T,u,R]};R.contains.push(D)
-;const I={begin:/\(/,end:/\)/,relevance:0,keywords:c,contains:["self",{
+;const I={begin:/\(/,end:/\)/,relevance:0,keywords:c,contains:["self",ownSwift({
 match:b(Oe,/\s*:/),keywords:"_|0",relevance:0
-},...a,A,...l,...g,...p,f,k,...C,...T,R]},L={begin:/</,end:/>/,
+},false),...a,A,...l,...g,...p,f,k,...C,...T,R]},L={begin:/</,end:/>/,
 keywords:"repeat each",contains:[...a,R]},B={begin:/\(/,end:/\)/,keywords:c,
-contains:[{begin:m(d(b(Oe,/\s*:/)),d(b(Oe,/\s+/,Oe,/\s*:/))),end:/:/,
+contains:[ownSwift({begin:m(d(b(Oe,/\s*:/)),d(b(Oe,/\s+/,Oe,/\s*:/))),end:/:/,
 relevance:0,contains:[{className:"keyword",match:/\b_\b/},{className:"params",
-match:Oe}]},...a,...l,...p,f,k,...T,R,I],endsParent:!0,illegal:/["']/},F={
+match:Oe}]},true),...a,...l,...p,f,k,...T,R,I],endsParent:!0,illegal:/["']/},F={
 match:[/(func|macro)/,/\s+/,m(S.match,Oe,Ne)],className:{1:"keyword",
 3:"title.function"},contains:[L,B,n],illegal:[/\[/,/%/]},$={
 match:[/\b(?:subscript|init[?!]?)/,/\s*(?=[<(])/],className:{1:"keyword"},
@@ -1151,7 +1660,7 @@ match:[/class\b/,/\s+/,/func\b/,/\s+/,/\b[A-Za-z_][A-Za-z0-9_]*\b/],scope:{
 scope:{1:"keyword",3:"keyword"}},U,z,j,{beginKeywords:"import",end:/$/,
 contains:[...a],relevance:0},A,...l,...g,...p,f,k,...C,...T,R,I]}},
 grmr_typescript:e=>{
-const n=e.regex,t=ge(e),a=te,i=["any","void","number","boolean","string","object","never","symbol","bigint","unknown"],r={
+const t=ge(e),a=te,i=["any","void","number","boolean","string","object","never","symbol","bigint","unknown"],r={
 begin:[/namespace/,/\s+/,e.IDENT_RE],beginScope:{1:"keyword",3:"title.class"}
 },s={beginKeywords:"interface",end:/\{/,excludeEnd:!0,keywords:{
 keyword:"interface extends",built_in:i},contains:[t.exports.CLASS_REFERENCE]
@@ -1161,8 +1670,21 @@ literal:re,built_in:de.concat(i),"variable.language":le},c={className:"meta",
 begin:"@"+a},l=(e,n,t)=>{const a=e.contains.findIndex(e=>e.label===n)
 ;if(-1===a)throw Error("can not find mode to replace");e.contains.splice(a,1,t)}
 ;Object.assign(t.keywords,o),t.exports.PARAMS_CONTAINS.push(c)
-;const d=t.contains.find(e=>"attr"===e.scope),g=Object.assign({},d,{
-match:n.concat(a,n.lookahead(/\s*\?:/))})
+;const d=t.contains.find(e=>"attr"===e.scope);
+let optionalInput,optionalStart=-1,optionalEnd=0,optionalValid=!1;
+const optionalWord=/[0-9A-Za-z$_]+/g,optionalSpace=/\s*/g;
+const g=Object.assign({},d,{begin:/[A-Za-z$_]/,end:/[0-9A-Za-z$_]+/,returnBegin:!0,
+"on:begin":(match,response)=>{
+if(optionalInput!==match.input)optionalStart=-1;
+optionalInput=match.input;
+if(optionalStart<0||match.index<optionalStart||match.index>=optionalEnd){
+optionalStart=match.index;optionalWord.lastIndex=match.index;
+optionalWord.exec(match.input);optionalEnd=optionalWord.lastIndex;
+optionalSpace.lastIndex=optionalEnd;optionalSpace.exec(match.input);
+optionalValid=match.input.slice(optionalSpace.lastIndex,optionalSpace.lastIndex+2)==="?:";
+}
+if(!optionalValid)response.ignoreMatch();
+}});delete g.match
 ;return t.exports.PARAMS_CONTAINS.push([t.exports.CLASS_REFERENCE,d,g]),
 t.contains=t.contains.concat([c,r,s,g]),
 l(t,"shebang",e.SHEBANG()),l(t,"use_strict",{className:"meta",relevance:10,
@@ -1188,10 +1710,10 @@ variants:[{begin:/\b\d[\d_]*((\.[\d_]+(E[+-]?[\d_]+)?)|(E[+-]?[\d_]+))[RFD@!#]?/
 },{begin:/\b\d[\d_]*((U?[SIL])|[%&])?/},{begin:/&H[\dA-F_]+((U?[SIL])|[%&])?/},{
 begin:/&O[0-7_]+((U?[SIL])|[%&])?/},{begin:/&B[01_]+((U?[SIL])|[%&])?/}]},{
 className:"label",begin:/^\w+:/},o,c,{className:"meta",
-begin:/[\t ]*#(const|disable|else|elseif|enable|end|externalsource|if|region)\b/,
+begin:/^[\t ]*#(const|disable|else|elseif|enable|end|externalsource|if|region)\b/,
 end:/$/,keywords:{
 keyword:"const disable else elseif enable end externalsource if region then"},
-contains:[c]}]}},grmr_wasm:e=>{e.regex;const n=e.COMMENT(/\(;/,/;\)/)
+contains:[c]}]}},grmr_wasm:e=>{const n=e.COMMENT(/\(;/,/;\)/)
 ;return n.contains.push("self"),{name:"WebAssembly",keywords:{$pattern:/[\w.]+/,
 keyword:["anyfunc","block","br","br_if","br_table","call","call_indirect","data","drop","elem","else","end","export","func","global.get","global.set","local.get","local.set","local.tee","get_global","get_local","global","if","import","local","loop","memory","memory.grow","memory.size","module","mut","nop","offset","param","result","return","select","set_global","set_local","start","table","tee_local","then","type","unreachable"]
 },contains:[e.COMMENT(/;;/,/$/),n,{match:[/(?:offset|align)/,/\s*/,/=/],
@@ -1231,6 +1753,30 @@ end:/\/?>/,contains:[{className:"name",begin:t,relevance:0,starts:c}]},{
 className:"tag",begin:n.concat(/<\//,n.lookahead(n.concat(t,/>/))),contains:[{
 className:"name",begin:t,relevance:0},{begin:/>/,relevance:0,endsParent:!0}]}]}
 },grmr_yaml:e=>{
+function attr(rule,quote=""){
+const source=rule.begin.source;let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,heads=new Uint8Array(len),tails=new Uint8Array(len),ends=new Uint32Array(len+1),suffix=new Uint8Array(len+1),next=new Uint8Array(len+1);
+const head=RegExp("[\\w*@]",flags+"y"),tail=RegExp("[\\w*@ :()\\./-]",flags+"y"),colon=RegExp(":(?=[ \\t]|$)",flags+"y");
+ends[len]=len;
+for(let i=len-1;i>=0;i--){
+head.lastIndex=tail.lastIndex=colon.lastIndex=i;
+heads[i]=head.exec(input)!==null;tails[i]=tail.exec(input)!==null;
+ends[i]=tails[i]?ends[i+1]:i;
+suffix[i]=colon.exec(input)!==null||tails[i]&&suffix[i+1];
+}
+for(let i=0;i<len;i++){
+if(!quote)next[i]=heads[i]&&suffix[i+1];
+else if(input[i]===quote&&heads[i+1]){const end=ends[i+2];colon.lastIndex=end+1;next[i]=input[end]===quote&&colon.exec(input)!==null;}
+}
+eligible=next;cachedFlags=flags;full=RegExp(source,flags+"y");
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+return ownMode(rule,{select,selector:quote||"[\\w*@]",captures:0});
+}
 const n="true false yes no null",t="[\\w#;/?:@&=+$,.~*'()[\\]]+",a={
 className:"string",relevance:0,variants:[{begin:/"/,end:/"/},{begin:/\S+/}],
 contains:[e.BACKSLASH_ESCAPE,{className:"template-variable",variants:[{
@@ -1238,10 +1784,10 @@ begin:/\{\{/,end:/\}\}/},{begin:/%\{/,end:/\}/}]}]},i=e.inherit(a,{variants:[{
 begin:/'/,end:/'/,contains:[{begin:/''/,relevance:0}]},{begin:/"/,end:/"/},{
 begin:/[^\s,{}[\]]+/}]}),r={end:",",endsWithParent:!0,excludeEnd:!0,keywords:n,
 relevance:0},s={begin:/\{/,end:/\}/,contains:[r],illegal:"\\n",relevance:0},o={
-begin:"\\[",end:"\\]",contains:[r],illegal:"\\n",relevance:0},c=[{
-className:"attr",variants:[{begin:/[\w*@][\w*@ :()\./-]*:(?=[ \t]|$)/},{
-begin:/"[\w*@][\w*@ :()\./-]*":(?=[ \t]|$)/},{
-begin:/'[\w*@][\w*@ :()\./-]*':(?=[ \t]|$)/}]},{className:"meta",
+begin:"\\[",end:"\\]",contains:[r],illegal:"\\n",relevance:0},c=[ownMode({
+className:"attr",variants:[attr({begin:/[\w*@][\w*@ :()\./-]*:(?=[ \t]|$)/}),attr({
+begin:/"[\w*@][\w*@ :()\./-]*":(?=[ \t]|$)/},'"'),attr({
+begin:/'[\w*@][\w*@ :()\./-]*':(?=[ \t]|$)/},"'")]}),{className:"meta",
 begin:"^---\\s*$",relevance:10},{className:"string",
 begin:"[\\|>]([1-9]?[+-])?[ ]*\\n( +)[^ ][^\\n]*\\n(\\2[^\\n]+\\n?)*"},{
 begin:"<%[%=-]?",end:"[%-]?%>",subLanguage:"ruby",excludeBegin:!0,excludeEnd:!0,

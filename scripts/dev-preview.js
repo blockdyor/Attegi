@@ -139,7 +139,7 @@ function loadEnvFile(fileName) {
 }
 
 function normalizeUrl(rawUrl) {
-  const value = String(rawUrl || '').trim().replace(/\/+$/, '');
+  const value = trimTrailingSlashes(String(rawUrl || '').trim());
   if (!value) return '';
   if (/^https?:\/\//i.test(value)) return value;
   return `https://${value}`;
@@ -225,7 +225,13 @@ async function handleRequest(request, response) {
 
 function normalizePathname(pathname) {
   if (!pathname || pathname === '/') return '/';
-  return pathname.replace(/\/+$/, '') || '/';
+  return trimTrailingSlashes(pathname) || '/';
+}
+
+function trimTrailingSlashes(value) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
 }
 
 function hasRequestExtension(pathname) {
@@ -266,8 +272,19 @@ function confinedPath(root, filePath) {
 }
 
 async function serveRemoteAsset(pathname, response) {
-  const remoteUrl = new URL(pathname.replace(/^\/+/, ''), withTrailingSlash(api.siteUrl));
-  const remoteResponse = await fetch(remoteUrl);
+  const siteOrigin = new URL(api.siteUrl).origin;
+  let remoteUrl = new URL(pathname.replace(/^\/+/, ''), withTrailingSlash(api.siteUrl));
+  let remoteResponse;
+  for (let redirects = 0; redirects <= 20; redirects++) {
+    // Absolute paths and redirect destinations must stay on the configured Ghost origin.
+    if (remoteUrl.origin !== siteOrigin) throw forbiddenPath();
+    remoteResponse = await fetch(remoteUrl, { redirect: 'manual' });
+    const location = remoteResponse.headers.get('location');
+    if (![301, 302, 303, 307, 308].includes(remoteResponse.status) || !location) break;
+    await remoteResponse.body?.cancel();
+    if (redirects === 20) throw new Error('Too many asset redirects');
+    remoteUrl = new URL(location, remoteUrl);
+  }
 
   if (!remoteResponse.ok) {
     response.writeHead(remoteResponse.status || 404, { 'Cache-Control': 'no-store' });
@@ -350,7 +367,7 @@ async function buildRouteModel(pathname) {
   const slug = pathname.slice(1);
   const page = await maybe(() => api.pageBySlug(slug));
   if (page && page.pages && page.pages[0]) {
-    const pageModel = decoratePost(page.pages[0], common.site.url, true);
+    const pageModel = decoratePost(page.pages[0], common.site.url);
     return {
       ...common,
       ...pageModel,
@@ -363,7 +380,7 @@ async function buildRouteModel(pathname) {
 
   const post = await maybe(() => api.postBySlug(slug));
   if (post && post.posts && post.posts[0]) {
-    const postModel = decoratePost(post.posts[0], common.site.url, false);
+    const postModel = decoratePost(post.posts[0], common.site.url);
     postModel.comments = Boolean(common.ghost.commentsEnabled);
     const navPosts = await listPosts({ limit: 20 });
     const navIndex = navPosts.items.findIndex((item) => item.slug === postModel.slug);
@@ -472,7 +489,7 @@ async function listPosts(params = {}) {
   });
 
   return {
-    items: (data.posts || []).map((post) => decoratePost(post, api.siteUrl, false)),
+    items: (data.posts || []).map((post) => decoratePost(post, api.siteUrl)),
     meta: data.meta || { pagination: {} }
   };
 }
@@ -505,10 +522,10 @@ function decorateNavigation(items, currentPath, siteUrl) {
   });
 }
 
-function decoratePost(post, siteUrl, isPage) {
+function decoratePost(post, siteUrl) {
   const tags = (post.tags || []).map((tag) => decorateTag(tag, siteUrl));
   const authors = (post.authors || []).map((author) => decorateAuthor(author, siteUrl));
-  const urlPath = isPage ? `/${post.slug}/` : `/${post.slug}/`;
+  const urlPath = `/${post.slug}/`;
   const html = absolutizeContentAssets(post.html || '', siteUrl);
 
   return {
@@ -1112,15 +1129,30 @@ function readingTime(html) {
 }
 
 function stripHtml(html) {
-  return String(html || '').replace(/<[^>]+>/g, ' ');
+  const value = String(html || '');
+  const parts = [];
+  let cursor = 0;
+  let start = value.indexOf('<');
+  while (start !== -1) {
+    const end = value.indexOf('>', start + 1);
+    if (end === -1) break;
+    if (end > start + 1) {
+      parts.push(value.slice(cursor, start), ' ');
+      cursor = end + 1;
+    }
+    start = value.indexOf('<', end + 1);
+  }
+  parts.push(value.slice(cursor));
+  return parts.join('');
 }
 
 function slugify(value) {
-  return String(value || '')
+  const slug = String(value || '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9]+/g, '-');
+  // Separator runs above collapse to one hyphen at either boundary.
+  return slug.slice(slug.startsWith('-') ? 1 : 0, slug.endsWith('-') ? -1 : undefined);
 }
 
 function maybe(fn) {

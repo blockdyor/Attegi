@@ -1,3 +1,5 @@
+@use "sass:selector";
+
 // ==========================================================================
 // Shared mixins and placeholders
 // ==========================================================================
@@ -21,7 +23,7 @@
 			@content;
 		}
 	} @else {
-		.theme-dark & {
+		@at-root #{selector.nest('.theme-dark', &)} {
 			@content;
 		}
 	}
@@ -32,7 +34,7 @@
 				@content;
 			}
 		} @else {
-			html:not(.theme-light) & {
+			@at-root #{selector.nest('html:not(.theme-light)', &)} {
 				@content;
 			}
 		}

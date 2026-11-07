@@ -1,5 +1,7 @@
 # Theme Modernization Implementation Plan
 
+> Superseded launcher implementation: follow-up restores Ghost's actual Portal-owned floating button so the native editor controls its text/icon/style. Do not reintroduce the clone or hide the native iframe. The completed steps below document v6.12.5, not the corrected target.
+
 > **For agentic workers:** Use superpowers:executing-plans for parent integration; isolated helpers return scoped commits and evidence.
 
 **Goal:** Deliver the approved measured theme update without a rewrite.

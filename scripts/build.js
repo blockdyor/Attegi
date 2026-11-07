@@ -113,23 +113,20 @@ async function build() {
 
   const startTime = Date.now();
 
-  try {
-    // Copy assets
-    console.log('\n[Assets] Copying static files...');
-    await copyVendorFiles();
-    await copyCssVendor();
+  // Copy assets
+  console.log('\n[Assets] Copying static files...');
+  await copyVendorFiles();
+  await copyCssVendor();
 
-    // Build JavaScript
-    await buildJS();
+  // Build JavaScript
+  await buildJS();
 
-    const elapsed = Date.now() - startTime;
-    console.log(`\n[Done] Build completed in ${elapsed}ms`);
-
-  } catch (error) {
-    console.error('\n[Error] Build failed:', error.message);
-    process.exit(1);
-  }
+  const elapsed = Date.now() - startTime;
+  console.log(`\n[Done] Build completed in ${elapsed}ms`);
 }
 
-// Run build
-build();
+// Handle the entry promise, including failures before asset copying starts.
+build().catch((error) => {
+  console.error('\n[Error] Build failed:', error.message);
+  process.exit(1);
+});

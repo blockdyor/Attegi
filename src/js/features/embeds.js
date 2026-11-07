@@ -31,8 +31,8 @@ export function wrapEmbeds(container) {
     if (!value) return null;
     var trimmed = value.trim();
     if (!trimmed || /%$/.test(trimmed)) return null;
-    var numberValue = parseFloat(trimmed);
-    if (isNaN(numberValue)) return null;
+    var numberValue = Number.parseFloat(trimmed);
+    if (Number.isNaN(numberValue)) return null;
     return numberValue > 0 ? numberValue : null;
   }
 
