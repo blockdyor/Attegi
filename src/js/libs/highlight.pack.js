@@ -275,7 +275,10 @@ this.matchIndexes={},this.regexes=[],this.matchAt=1,this.position=0}
 addRule(e,n){
 n=Object.assign({},n,{position:this.position++}),this.matchIndexes[this.matchAt]=n,this.regexes.push([n,e]),
 this.matchAt+=p(e)+1}compile(){0===this.regexes.length&&(this.exec=()=>null)
-;const e=this.regexes.map(e=>e[1]);this.matcherRe=n(h(e,{joinWith:"|"
+;const e=this.regexes.map(e=>e[1]);
+// Validate the ordinary combined matcher under current flags before substituting owned selectors.
+if(this.regexes.some(([e])=>e.rule&&compiledRecognizers.has(e.rule)))n(h(this.regexes.map(([e,n])=>e.rule&&compiledRecognizers.has(e.rule)?e.rule.begin:n),{joinWith:"|"}),!0);
+this.matcherRe=n(h(e,{joinWith:"|"
 }),!0),this.lastIndex=0}exec(e){this.matcherRe.lastIndex=this.lastIndex
 ;const n=this.matcherRe.exec(e);if(!n)return null
 ;const t=n.findIndex((e,n)=>n>0&&void 0!==e),a=this.matchIndexes[t]
