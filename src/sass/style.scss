@@ -2944,8 +2944,9 @@ textarea {
 	}
 }
 
-// Match Portal's normal-scheme document so dark mode does not force an opaque iframe canvas.
-.gh-portal-triggerbtn-iframe {
+// Match Portal documents, including the popup, so dark mode keeps their canvas transparent.
+.gh-portal-triggerbtn-iframe,
+#ghost-portal-root iframe {
 	color-scheme: normal;
 }
 

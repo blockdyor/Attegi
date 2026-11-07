@@ -6,6 +6,10 @@ This document describes how to create a new release for the Attegi theme.
 
 The theme uses GitHub Actions to automate the release process.
 
+Release display titles and release-note headings use **Attegi for blockdyor vX.Y.Z**.
+Git tags remain `vX.Y.Z`; the package ID and downloadable filename remain
+`attegi` and `attegi.zip`. Upstream credits and licensing are unchanged.
+
 ### Method 1: Manual Release (Recommended)
 
 1. **Update version in package.json**

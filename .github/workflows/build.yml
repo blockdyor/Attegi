@@ -93,12 +93,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
-          name: ${{ steps.package.outputs.name }} v${{ steps.package.outputs.version }}
+          name: Attegi for blockdyor v${{ steps.package.outputs.version }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: dist/attegi.zip
           body: |
-            ## 🎨 ${{ steps.package.outputs.name }} v${{ steps.package.outputs.version }}
+            ## 🎨 Attegi for blockdyor v${{ steps.package.outputs.version }}
 
             ${{ steps.package.outputs.description }}
 

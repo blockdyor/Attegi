@@ -200,13 +200,13 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.package.outputs.name }} ${{ steps.version.outputs.tag }}
+          name: Attegi for blockdyor ${{ steps.version.outputs.tag }}
           generate_release_notes: true
           draft: false
           prerelease: false
           files: dist/attegi.zip
           body: |
-            ## 🎨 ${{ steps.package.outputs.name }} ${{ steps.version.outputs.tag }}
+            ## 🎨 Attegi for blockdyor ${{ steps.version.outputs.tag }}
 
             ${{ steps.package.outputs.description }}
 
