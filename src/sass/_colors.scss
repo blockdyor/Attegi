@@ -15,6 +15,8 @@
   // pre-JS/no-JS fallbacks for the shipped default accent colors.
   // Keep computed values separate so this later stylesheet cannot reset them.
   --color-on-accent: var(--attegi-on-accent, #fff);
+  --color-on-accent-glass: var(--attegi-on-accent-glass, #000);
+  --color-on-accent-glass-hover: var(--attegi-on-accent-glass-hover, #000);
 
   // Accent color for TEXT (links, etc.), as opposed to accent-colored fills.
   // Ghost admins can pick a light or low-contrast accent that reads fine as

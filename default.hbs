@@ -114,6 +114,17 @@ own cover-active case is already covered there, so this attribute only needs the
 					return luminance > 0.1791 ? '#1D1F21' : '#fff';
 				}
 
+				// Glass pills tint the accent with white; choose ink for that fill, not the raw accent.
+				function onGlassAccentFor(hex, amount) {
+					if (luminanceOf(hex) === null) return '#000';
+					var n = parseInt(hex.replace('#', ''), 16);
+					var r = ((n >> 16) & 255) * amount + 255 * (1 - amount);
+					var g = ((n >> 8) & 255) * amount + 255 * (1 - amount);
+					var b = (n & 255) * amount + 255 * (1 - amount);
+					var luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+					return luminance > 0.1791 ? '#000' : '#fff';
+				}
+
 				function contrastOf(l1, l2) {
 					var lighter = Math.max(l1, l2), darker = Math.min(l1, l2);
 					return (lighter + 0.05) / (darker + 0.05);
@@ -146,9 +157,9 @@ own cover-active case is already covered there, so this attribute only needs the
 
 				var accentStyle = document.createElement('style');
 				accentStyle.textContent =
-					':root { --attegi-on-accent: ' + onAccentFor(lightAccent) + '; --attegi-accent-text: ' + lightAccentText + '; }' +
-					'.theme-dark:root { --attegi-on-accent: ' + onAccentFor(darkAccent) + '; --ghost-accent-color: ' + darkAccent + '; --attegi-accent-text: ' + darkAccentText + '; }' +
-					'@media (prefers-color-scheme: dark) { html:not(.theme-light):root { --attegi-on-accent: ' + onAccentFor(darkAccent) + '; --ghost-accent-color: ' + darkAccent + '; --attegi-accent-text: ' + darkAccentText + '; } }';
+					':root { --attegi-on-accent: ' + onAccentFor(lightAccent) + '; --attegi-on-accent-glass: ' + onGlassAccentFor(lightAccent, 0.72) + '; --attegi-on-accent-glass-hover: ' + onGlassAccentFor(lightAccent, 0.62) + '; --attegi-accent-text: ' + lightAccentText + '; }' +
+					'.theme-dark:root { --attegi-on-accent: ' + onAccentFor(darkAccent) + '; --attegi-on-accent-glass: ' + onGlassAccentFor(darkAccent, 0.72) + '; --attegi-on-accent-glass-hover: ' + onGlassAccentFor(darkAccent, 0.62) + '; --ghost-accent-color: ' + darkAccent + '; --attegi-accent-text: ' + darkAccentText + '; }' +
+					'@media (prefers-color-scheme: dark) { html:not(.theme-light):root { --attegi-on-accent: ' + onAccentFor(darkAccent) + '; --attegi-on-accent-glass: ' + onGlassAccentFor(darkAccent, 0.72) + '; --attegi-on-accent-glass-hover: ' + onGlassAccentFor(darkAccent, 0.62) + '; --ghost-accent-color: ' + darkAccent + '; --attegi-accent-text: ' + darkAccentText + '; } }';
 				document.head.appendChild(accentStyle);
 
 				// Hide the toggle when @custom.color_scheme forces a theme.

@@ -2742,6 +2742,12 @@ textarea {
 		height: 4rem;
 		object-fit: contain;
 		object-position: left center;
+		// Keep the monochrome wordmark readable without filtering content images.
+		filter: brightness(0);
+
+		@include dark {
+			filter: brightness(0) invert(1);
+		}
 	}
 
 	.wordmark {
@@ -2920,7 +2926,7 @@ textarea {
 // rather than a solid brand block.
 .nav-button-primary {
 	@extend %glass-pill;
-	color: var(--color-on-accent);
+	color: var(--color-on-accent-glass);
 	text-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
 	background: color-mix(in srgb, var(--ghost-accent-color) 72%, #fff);
 	border-color: color-mix(in srgb, var(--ghost-accent-color) 60%, #fff);
@@ -2932,11 +2938,12 @@ textarea {
 
 	&:link,
 	&:visited {
-		color: var(--color-on-accent);
+		color: var(--color-on-accent-glass);
 	}
 
 	@media (hover: hover) and (pointer: fine) {
 		&:hover {
+			color: var(--color-on-accent-glass-hover);
 			background: color-mix(in srgb, var(--ghost-accent-color) 62%, #fff);
 			border-color: color-mix(in srgb, var(--ghost-accent-color) 50%, #fff);
 			box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), var(--shadow-glass-hover);
@@ -2944,9 +2951,10 @@ textarea {
 	}
 }
 
-// Match Portal documents, including the popup, so dark mode keeps their canvas transparent.
+// Match native popup documents so dark mode keeps their iframe canvases transparent.
 .gh-portal-triggerbtn-iframe,
-#ghost-portal-root iframe {
+#ghost-portal-root iframe,
+#sodo-search-root iframe {
 	color-scheme: normal;
 }
 
@@ -2970,6 +2978,10 @@ textarea {
    header's bottom edge leaves the cover. */
 .cover-active .nav-header {
 	background-image: linear-gradient(to bottom, rgb(0 0 0 / 0.3), rgb(0 0 0 / 0));
+
+	.logo img {
+		filter: brightness(0) invert(1);
+	}
 
 	.wordmark,
 	.site-nav a,
