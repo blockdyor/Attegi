@@ -6,6 +6,60 @@ const postcss = require('postcss');
 const sassRoot = path.resolve(process.env.THEME_ROOT || path.resolve(__dirname, '../..'), 'src/sass');
 const css = postcss.parse(sass.compile(path.join(sassRoot, 'style.scss'), {style: 'compressed', silenceDeprecations: ['import']}).css);
 
+test('the monochrome navigation logo is dark on light surfaces', () => {
+  let filter;
+  css.walkRules(rule => {
+    if (rule.selector === '.nav-brand .logo img' && rule.parent.type === 'root') {
+      filter = rule.nodes.find(node => node.prop === 'filter')?.value;
+    }
+  });
+  assert.equal(filter, 'brightness(0)', 'A white uploaded wordmark must not disappear on the light homepage');
+});
+
+test('the monochrome navigation logo is light in manually selected dark mode', () => {
+  let filter;
+  css.walkRules(rule => {
+    if (rule.selector === '.theme-dark .nav-brand .logo img') {
+      filter = rule.nodes.find(node => node.prop === 'filter')?.value;
+    }
+  });
+  assert.equal(filter, 'brightness(0) invert(1)');
+});
+
+test('system-dark logo styling does not override manually selected light mode', () => {
+  let filter;
+  css.walkRules(rule => {
+    if (rule.selector === 'html:not(.theme-light) .nav-brand .logo img' &&
+        rule.parent.type === 'atrule' && rule.parent.params === '(prefers-color-scheme: dark)') {
+      filter = rule.nodes.find(node => node.prop === 'filter')?.value;
+    }
+  });
+  assert.equal(filter, 'brightness(0) invert(1)');
+});
+
+test('a logo over a cover image stays white in either theme', () => {
+  let filter;
+  css.walkRules(rule => {
+    if (rule.selector === '.cover-active .nav-header .logo img') {
+      filter = rule.nodes.find(node => node.prop === 'filter')?.value;
+    }
+  });
+  assert.equal(filter, 'brightness(0) invert(1)');
+});
+
+test('navigation glass pills use ink for their actual normal and hovered fills', () => {
+  const declarations = {};
+  css.walkRules(rule => {
+    if (['.nav-button-primary', '.nav-button-primary:hover'].includes(rule.selector)) {
+      declarations[rule.selector] = Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
+    }
+  });
+  assert.equal(declarations['.nav-button-primary'].color, 'var(--color-on-accent-glass)');
+  assert.equal(declarations['.nav-button-primary:hover'].color, 'var(--color-on-accent-glass-hover)');
+  assert.ok(declarations['.nav-button-primary'].background.includes('72%'));
+  assert.ok(declarations['.nav-button-primary:hover'].background.includes('62%'));
+});
+
 test('footer network navigation retains its flex layout without the blocked selector', () => {
   let layout;
   css.walkRules(rule => {

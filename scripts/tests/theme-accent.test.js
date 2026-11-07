@@ -41,6 +41,36 @@ for (const [accent, expectedInk] of [['#F7931A', '#1D1F21'], ['#101010', '#fff']
   });
 }
 
+test('glass accent ink is readable against the actual normal and hover mixtures', () => {
+  const luminance = rgb => rgb.map(channel => channel / 255).map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  for (const accent of ['#3A6B7E', '#000000', '#FFFFFF', '#F7931A', '#101010', '#BE834F']) {
+    const runtime = accentStyles(accent);
+    for (const [selector, value] of [[':root', accent], ['.theme-dark:root', '#82C0CC']]) {
+      const rule = runtime.nodes.find(node => node.selector === selector);
+      const rgb = [1, 3, 5].map(start => parseInt(value.slice(start, start + 2), 16));
+      for (const [suffix, amount] of [['', 0.72], ['-hover', 0.62]]) {
+        const ink = rule.nodes.find(node => node.prop === '--attegi-on-accent-glass' + suffix)?.value;
+        assert.ok(ink === '#000' || ink === '#fff', 'Missing glass-specific ink for ' + value + suffix);
+        const bg = luminance(rgb.map(channel => channel * amount + 255 * (1 - amount)));
+        const fg = ink === '#fff' ? 1 : 0;
+        assert.ok((Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05) >= 4.5, value + suffix);
+      }
+    }
+  }
+});
+
+test('later stylesheet consumes computed glass ink without redefining it', () => {
+  for (const suffix of ['', '-hover']) {
+    let found = false;
+    colors.walkDecls('--color-on-accent-glass' + suffix, decl => {
+      assert.ok(decl.value.startsWith('var(--attegi-on-accent-glass' + suffix + ','));
+      found = true;
+    });
+    assert.ok(found, 'Missing glass ink consumer ' + suffix);
+  }
+});
+
 test('later stylesheet consumes runtime accent values instead of overwriting them', () => {
   let count = 0;
   colors.walkDecls('--color-on-accent', decl => {
