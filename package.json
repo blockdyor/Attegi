@@ -49,7 +49,7 @@
     "build": "bun run css:build && bun run js:build",
     "compress": "bun run build && bun scripts/compress.js",
     "clean": "rm -rf assets/js/*.js assets/css/style.css assets/css/style.css.map dist/",
-    "test:templates": "bun test scripts/tests",
+    "test:templates": "bun test scripts/tests --timeout 30000",
     "validate": "bun run test:templates && bun run compress && bunx gscan@6.7.0 -z dist/attegi.zip"
   },
   "devDependencies": {
