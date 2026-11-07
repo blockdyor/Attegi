@@ -974,9 +974,25 @@ begin:/[\!\(\)\:\=\[\]\{\|\}]{1}/,relevance:0},{scope:"variable",begin:/\$/,
 end:/\W/,excludeEnd:!0,relevance:0},{scope:"meta",match:/@\w+/,excludeEnd:!0},ownRecognizer({
 scope:"symbol",begin:n.concat(/[_A-Za-z][_0-9A-Za-z]*/,n.lookahead(/\s*:/)),
 relevance:0},(value,at,flags)=>{index(value,flags);const end=identifierEnd[at];
-return end&&value[nextNonspace[end]]===":"?end:0;})],illegal:[/[;<']/,/BEGIN/]}},grmr_ini:e=>{const n=e.regex,t={
-className:"number",relevance:0,variants:[{begin:/([+-]+)?[\d]+_[\d_]+/},{
-begin:e.NUMBER_RE}]},a=e.COMMENT();a.variants=[{begin:/;/,end:/$/},{begin:/#/,
+return end&&value[nextNonspace[end]]===":"?end:0;})],illegal:[/[;<']/,/BEGIN/]}},grmr_ini:e=>{function number(rule){
+const source=rule.begin.source;let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const next=new Uint8Array(input.length+2),digit=i=>{const c=input.charCodeAt(i);return c>=48&&c<=57;};
+for(let i=input.length-1;i>=0;i--){
+const c=input[i];
+next[i]=digit(i)?(input[i+1]==="_"&&(digit(i+2)||input[i+2]==="_")||digit(i+1)&&next[i+1]):(c==="+"||c==="-")&&next[i+1];
+}
+eligible=next;cachedFlags=flags;full=RegExp(source,flags+"y");
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+return ownMode(rule,{select,selector:"[+0-9-]()",captures:1});
+}
+const n=e.regex,t=ownMode({
+className:"number",relevance:0,variants:[number({begin:/([+-]+)?[\d]+_[\d_]+/}),{
+begin:e.NUMBER_RE}]}),a=e.COMMENT();a.variants=[{begin:/;/,end:/$/},{begin:/#/,
 end:/$/}];const i={className:"variable",variants:[{begin:/\$[\w\d"][\w\d_]*/},{
 begin:/\$\{(.*?)\}/}]},r={className:"literal",
 begin:/\bon|off|true|false|yes|no\b/},s={className:"string",
@@ -1737,6 +1753,30 @@ end:/\/?>/,contains:[{className:"name",begin:t,relevance:0,starts:c}]},{
 className:"tag",begin:n.concat(/<\//,n.lookahead(n.concat(t,/>/))),contains:[{
 className:"name",begin:t,relevance:0},{begin:/>/,relevance:0,endsParent:!0}]}]}
 },grmr_yaml:e=>{
+function attr(rule,quote=""){
+const source=rule.begin.source;let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,heads=new Uint8Array(len),tails=new Uint8Array(len),ends=new Uint32Array(len+1),suffix=new Uint8Array(len+1),next=new Uint8Array(len+1);
+const head=RegExp("[\\w*@]",flags+"y"),tail=RegExp("[\\w*@ :()\\./-]",flags+"y"),colon=RegExp(":(?=[ \\t]|$)",flags+"y");
+ends[len]=len;
+for(let i=len-1;i>=0;i--){
+head.lastIndex=tail.lastIndex=colon.lastIndex=i;
+heads[i]=head.exec(input)!==null;tails[i]=tail.exec(input)!==null;
+ends[i]=tails[i]?ends[i+1]:i;
+suffix[i]=colon.exec(input)!==null||tails[i]&&suffix[i+1];
+}
+for(let i=0;i<len;i++){
+if(!quote)next[i]=heads[i]&&suffix[i+1];
+else if(input[i]===quote&&heads[i+1]){const end=ends[i+2];colon.lastIndex=end+1;next[i]=input[end]===quote&&colon.exec(input)!==null;}
+}
+eligible=next;cachedFlags=flags;full=RegExp(source,flags+"y");
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+return ownMode(rule,{select,selector:quote||"[\\w*@]",captures:0});
+}
 const n="true false yes no null",t="[\\w#;/?:@&=+$,.~*'()[\\]]+",a={
 className:"string",relevance:0,variants:[{begin:/"/,end:/"/},{begin:/\S+/}],
 contains:[e.BACKSLASH_ESCAPE,{className:"template-variable",variants:[{
@@ -1744,10 +1784,10 @@ begin:/\{\{/,end:/\}\}/},{begin:/%\{/,end:/\}/}]}]},i=e.inherit(a,{variants:[{
 begin:/'/,end:/'/,contains:[{begin:/''/,relevance:0}]},{begin:/"/,end:/"/},{
 begin:/[^\s,{}[\]]+/}]}),r={end:",",endsWithParent:!0,excludeEnd:!0,keywords:n,
 relevance:0},s={begin:/\{/,end:/\}/,contains:[r],illegal:"\\n",relevance:0},o={
-begin:"\\[",end:"\\]",contains:[r],illegal:"\\n",relevance:0},c=[{
-className:"attr",variants:[{begin:/[\w*@][\w*@ :()\./-]*:(?=[ \t]|$)/},{
-begin:/"[\w*@][\w*@ :()\./-]*":(?=[ \t]|$)/},{
-begin:/'[\w*@][\w*@ :()\./-]*':(?=[ \t]|$)/}]},{className:"meta",
+begin:"\\[",end:"\\]",contains:[r],illegal:"\\n",relevance:0},c=[ownMode({
+className:"attr",variants:[attr({begin:/[\w*@][\w*@ :()\./-]*:(?=[ \t]|$)/}),attr({
+begin:/"[\w*@][\w*@ :()\./-]*":(?=[ \t]|$)/},'"'),attr({
+begin:/'[\w*@][\w*@ :()\./-]*':(?=[ \t]|$)/},"'")]}),{className:"meta",
 begin:"^---\\s*$",relevance:10},{className:"string",
 begin:"[\\|>]([1-9]?[+-])?[ ]*\\n( +)[^ ][^\\n]*\\n(\\2[^\\n]+\\n?)*"},{
 begin:"<%[%=-]?",end:"[%-]?%>",subLanguage:"ruby",excludeBegin:!0,excludeEnd:!0,
