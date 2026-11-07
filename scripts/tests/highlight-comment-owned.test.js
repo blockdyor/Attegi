@@ -14,3 +14,7 @@ for(const script of ['probe','contracts','guards'])test(`COMMENT native selectio
  const r=spawnSync(process.execPath,[new URL(`highlight-comment-${script}.cjs`,import.meta.url).pathname],{encoding:'utf8',timeout});
  expect(r.error,r.stderr).toBeUndefined();expect(r.status,r.stdout+r.stderr).toBe(0);console.log(r.stdout.trim());
 },95000);
+test('COMMENT cache rebinds equal-valued fresh decoded input references',()=>{
+ const r=spawnSync('node',['--allow-natives-syntax',new URL('highlight-comment-cache.cjs',import.meta.url).pathname],{encoding:'utf8',timeout:30000});
+ expect(r.error,r.stderr).toBeUndefined();expect(r.status,r.stdout+r.stderr).toBe(0);console.log(r.stdout.trim());
+},35000);

@@ -46,8 +46,10 @@ i--;
 }
 }
 // Only the latest input/actual matcher flags are retained; reentry may evict them.
-cachedInput=input;cachedFlags=flags;eligible=next;full=native;
+cachedFlags=flags;eligible=next;full=native;
 }
+// Equal-valued decoded strings must rebind the current reference on cache hits too.
+cachedInput=input;
 if(!eligible[at])return null;
 full.lastIndex=at;return full.exec(input);
 };
