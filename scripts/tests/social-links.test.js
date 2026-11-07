@@ -61,8 +61,8 @@ test('ordinary footer navigation does not match Fanboy’s generic social-wrappe
 test('footer links retain every label and self-contained inline SVG', () => {
   const html = renderFooterLinks().html;
   const labels = Array.from(html.matchAll(/<a\b[^>]*aria-label="([^"]+)"/g), match => match[1]);
-  const expected = ['RSS', 'X', 'Facebook', 'LinkedIn', 'Bluesky', 'Threads', 'Mastodon', 'TikTok', 'YouTube', 'Instagram', 'GitHub', 'Telegram', 'Discord', 'Email'];
-  assert.deepEqual(labels.toSorted(), expected.toSorted());
+  const expected = ['RSS', 'X', 'Bluesky', 'Instagram', 'Telegram', 'Discord', 'GitHub', 'Email'];
+  assert.deepEqual(labels, expected);
   assert.equal((html.match(/<svg\b/g) || []).length, expected.length);
   assert.doesNotMatch(html, /<(?:img|image|use|script|iframe)\b[^>]*(?:src|href)=/i);
 });
@@ -126,12 +126,14 @@ test('new footer icons inherit link colors without external assets or colored gr
 });
 
 for (const network of networks) {
-  test(`footer and error shell render with ${network} configured`, () => {
+  test(`footer and error shell respect the selected networks with ${network} configured`, () => {
     const hbs = renderer();
     const site = {title: 'Test site', url: 'https://example.com', [network]: 'account'};
     for (const body of ['Home', '404', '500', '400']) {
       const html = renderTemplate(hbs, 'default.hbs', {body}, site);
-      assert.match(html, new RegExp(`class="social-link" href="https://social.example/${network}"`));
+      const link = new RegExp(`class="social-link" href="https://social.example/${network}"`);
+      if (['twitter', 'bluesky', 'instagram'].includes(network)) assert.match(html, link);
+      else assert.doesNotMatch(html, link);
       assert.ok(html.includes(body));
     }
   });
@@ -142,6 +144,27 @@ for (const network of networks) {
     assert.doesNotMatch(html, /\bnofollow\b/, 'Footer-only link policy must not change author profiles');
   });
 }
+
+test('the complete footer order is stable for native and legacy accounts', () => {
+  const custom = {
+    nostr_url: 'https://example.com/nostr', bluesky_url: 'https://example.com/bluesky',
+    instagram_url: 'https://example.com/instagram', telegram_url: 'https://t.me/example',
+    discord_url: 'https://discord.gg/example', github_url: 'https://github.com/example',
+    amboss_url: 'https://example.com/amboss', mempool_url: 'https://example.com/mempool',
+    email_address: 'hello@example.com'
+  };
+  const expected = ['RSS', 'X', 'Nostr', 'Bluesky', 'Instagram', 'Telegram', 'Discord', 'GitHub', 'Amboss', 'Mempool.space', 'Email'];
+  for (const native of [false, true]) {
+    const site = native ? Object.fromEntries(networks.map(key => [key, 'account'])) : {twitter: 'account'};
+    const html = renderTemplate(renderer(), 'default.hbs', {body: 'Home'}, site, null, custom);
+    const group = html.match(/<div class="footer-network-links">([\s\S]*?)<\/div>/)[1];
+    assert.deepEqual(Array.from(group.matchAll(/aria-label="([^"]+)"/g), match => match[1]), expected);
+    for (const network of ['bluesky', 'instagram']) {
+      assert.ok(group.includes(native ? `https://social.example/${network}` : custom[`${network}_url`]));
+      if (native) assert.ok(!group.includes(custom[`${network}_url`]));
+    }
+  }
+});
 
 test('no accounts render no social links, including site accounts on an author without accounts', () => {
   const hbs = renderer();
