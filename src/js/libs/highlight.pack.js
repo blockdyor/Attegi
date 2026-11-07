@@ -20,6 +20,28 @@ return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace
 function ownRecognizer(rule,span){
 ownedRecognizers.set(rule,{shape:Object.assign({},rule),span});return rule;
 }
+function ownSwift(rule,two){
+const source=l(rule.match||rule.begin),captures=p(source);
+let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,heads=new Uint8Array(len),tails=new Uint8Array(len),spaces=new Uint8Array(len),ends=new Uint32Array(len+1),gaps=new Uint32Array(len+1),next=new Uint8Array(len+1);
+const head=RegExp(ke,flags+"y"),tail=RegExp(xe,flags+"y"),space=RegExp("\\s",flags+"y"),native=RegExp(source,flags+"y");
+for(let i=0;i<len;i++){head.lastIndex=tail.lastIndex=space.lastIndex=i;heads[i]=head.exec(input)!==null;tails[i]=tail.exec(input)!==null;spaces[i]=space.exec(input)!==null;}
+ends[len]=gaps[len]=len;
+for(let i=len-1;i>=0;i--){ends[i]=tails[i]?ends[i+1]:i;gaps[i]=spaces[i]?gaps[i+1]:i;}
+for(let i=0;i<len;i++)if(heads[i]){const end=ends[i+1],gap=gaps[end];
+if(input[gap]===":")next[i]=1;
+else if(two&&gap>end&&heads[gap]&&input[gaps[ends[gap+1]]]===":")next[i]=1;
+}
+cachedFlags=flags;eligible=next;full=native;
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+const shape=Object.assign({},rule);if(shape.match){shape.begin=shape.match;delete shape.match;}
+ownedRecognizers.set(rule,{shape,select,selector:ke,captures});return rule;
+}
 function ownComment(rule,phrase){
 const source=l(rule.begin),captures=phrase?3:1;
 const marker="(?:TODO|FIXME|NOTE|BUG|OPTIMIZE|HACK|XXX):";
@@ -1412,13 +1434,13 @@ match:b(/(AV|CA|CF|CG|CI|CL|CM|CN|CT|MK|MP|MTK|MTL|NS|SCN|SK|UI|WK|XC)/,xe,"+")
 },{className:"type",match:Me,relevance:0},{match:/[?!]+/,relevance:0},{
 match:/\.\.\./,relevance:0},{match:b(/\s+&\s+/,d(Me)),relevance:0}]},D={
 begin:/</,end:/>/,keywords:c,contains:[...a,...l,...T,u,R]};R.contains.push(D)
-;const I={begin:/\(/,end:/\)/,relevance:0,keywords:c,contains:["self",{
+;const I={begin:/\(/,end:/\)/,relevance:0,keywords:c,contains:["self",ownSwift({
 match:b(Oe,/\s*:/),keywords:"_|0",relevance:0
-},...a,A,...l,...g,...p,f,k,...C,...T,R]},L={begin:/</,end:/>/,
+},false),...a,A,...l,...g,...p,f,k,...C,...T,R]},L={begin:/</,end:/>/,
 keywords:"repeat each",contains:[...a,R]},B={begin:/\(/,end:/\)/,keywords:c,
-contains:[{begin:m(d(b(Oe,/\s*:/)),d(b(Oe,/\s+/,Oe,/\s*:/))),end:/:/,
+contains:[ownSwift({begin:m(d(b(Oe,/\s*:/)),d(b(Oe,/\s+/,Oe,/\s*:/))),end:/:/,
 relevance:0,contains:[{className:"keyword",match:/\b_\b/},{className:"params",
-match:Oe}]},...a,...l,...p,f,k,...T,R,I],endsParent:!0,illegal:/["']/},F={
+match:Oe}]},true),...a,...l,...p,f,k,...T,R,I],endsParent:!0,illegal:/["']/},F={
 match:[/(func|macro)/,/\s+/,m(S.match,Oe,Ne)],className:{1:"keyword",
 3:"title.function"},contains:[L,B,n],illegal:[/\[/,/%/]},$={
 match:[/\b(?:subscript|init[?!]?)/,/\s*(?=[<(])/],className:{1:"keyword"},

@@ -11,7 +11,8 @@ assert.equal(hash(JSON.stringify({...fixture, originalFunctions:fixture.original
     'f5c408418770d5e548406621ed95122a9da0899f88ce871ec5e7f7a691527171');
 const {restoreOwned} = require('./highlight-owned-reconstruction.cjs');
 const {restoreComment} = require('./highlight-comment-reconstruction.cjs');
-const commentBaseline = restoreComment(source);
+const {restoreSwift} = require('./highlight-swift-reconstruction.cjs');
+const commentBaseline = restoreComment(restoreSwift(source));
 const core = restoreOwned(commentBaseline);
 assert.equal(hash(core), '6305f38028001c8e628e79ebdce09343687311672dc87786cec9d055d967a927');
 const old = 'n.position=this.position++,this.matchIndexes[this.matchAt]=n';

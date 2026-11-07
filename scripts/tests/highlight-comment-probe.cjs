@@ -1,6 +1,6 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const auth=require('./highlight-owned-auth.cjs'),{hash}=auth;
-const {restoreComment}=require('./fixtures/highlight-comment-reconstruction.cjs');
+const {restoreSwiftComment:restoreComment}=require('./fixtures/highlight-swift-reconstruction.cjs');
 const candidate=auth.source,baseline=restoreComment(candidate);
 assert.equal(hash(baseline),'4e9ee4915ccba94a5a696080397bb395a4cb4f7ebf9118869826c784a61faf6a');
 function setup(api,variant,events){

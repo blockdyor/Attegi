@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
 const auth=require('./highlight-owned-auth.cjs');
-const {restoreComment}=require('./fixtures/highlight-comment-reconstruction.cjs');
+const {restoreSwiftComment:restoreComment}=require('./fixtures/highlight-swift-reconstruction.cjs');
 const baseline=restoreComment(auth.source);
 let comparisons=0;
 function compare(name,run){assert.deepEqual(run(auth.load()),run(auth.load(baseline)),name);comparisons++;}

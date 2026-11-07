@@ -1,4 +1,4 @@
-import {restoreComment} from './fixtures/highlight-comment-reconstruction.cjs';
+import {restoreSwiftComment as restoreComment} from './fixtures/highlight-swift-reconstruction.cjs';
 import { beforeAll, test, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
