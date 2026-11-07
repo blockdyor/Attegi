@@ -18,6 +18,15 @@ test('the theme does not hide Ghost’s editable Portal launcher', () => {
   }
 });
 
+test('native Portal popup frames use their document scheme, not the parent dark scheme', () => {
+  const popupRules = [];
+  css.walkRules(rule => {
+    if (rule.selector.split(',').some(selector => selector.trim() === '#ghost-portal-root iframe')) popupRules.push(rule);
+  });
+  assert.ok(popupRules.some(rule => rule.nodes.some(node => node.type === 'decl' && node.prop === 'color-scheme' && node.value === 'normal')),
+    'The popup is a separate iframe: aligning only the launcher leaves an opaque dark-mode canvas');
+});
+
 test('native Portal frame scheme matches its normal-scheme document', () => {
   assert.ok(nativeRules.some(rule => rule.nodes.some(node => node.type === 'decl' && node.prop === 'color-scheme' && node.value === 'normal')),
     'A mismatched iframe scheme can force an opaque canvas in dark mode');
