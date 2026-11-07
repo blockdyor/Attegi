@@ -45,7 +45,9 @@ for(const debug of [false,true])check('scoped emitter reentry and fresh decoded 
  a[debug?'debugMode':'safeMode']();const E=a.highlight('',{language:'swift'})._emitter.constructor;let entered=false;class R extends E{addText(t){if(t&&!entered){entered=true;a.highlight('func inner(other local: Int) {}',{language:'swift'});}return super.addText(t);}}a.configure({__emitter:R});const r=a.highlight(witness,{language:'swift',ignoreIllegals:false});a.configure({__emitter:E});assert(entered);const out=[A.snapshot?A.snapshot(r):plain({value:r.value,index:r._illegalBy?.index,context:r._illegalBy?.context,tree:r._emitter.rootNode})];for(let i=0;i<3;i++)out.push(A.record(a,Buffer.from(witness).toString(),'swift',false));return out;
 },[A.original,...sources]);
 const registrations=text=>{const matches=Array.from(text.matchAll(/grmr_([a-z0-9_]+):/g));assert.equal(matches.length,36);return new Map(matches.map((m,i)=>[m[1],text.slice(m.index,matches[i+1]?.index||text.length)]));};
-const oldRegistrations=registrations(base),newRegistrations=registrations(A.source);let unchanged=0;
+// Compare Swift's historical delta only; APIs above still exercise the full candidate.
+const {restoreIni}=require('./fixtures/highlight-ini-reconstruction.cjs');
+const oldRegistrations=registrations(base),newRegistrations=registrations(restoreIni(A.source));let unchanged=0;
 for(const [name,body]of oldRegistrations)if(name!=='swift'){assert.equal(newRegistrations.get(name),body,name);unchanged++;}assert.equal(unchanged,35);
 const metadata=A.load();assert.equal(metadata.listLanguages().length,36);assert.equal(metadata.listLanguages().reduce((n,l)=>n+(metadata.getLanguage(l).aliases||[]).length,0),71);
 console.log(JSON.stringify({groups,unchangedOtherLanguages:unchanged,defaultCorpus:codes.length,source:A.hash(A.source),base:A.hash(base),original:A.hash(A.original),runtime:process.versions.bun||process.version,pass:true}));

@@ -1,0 +1,17 @@
+[
+  {
+    "candidate": "function ownIni(rule){\nconst source=l(rule.begin),captures=p(source);\nlet cachedInput,cachedFlags,eligible,full;\nconst select=(input,at,flags)=>{\nif(input!==cachedInput||flags!==cachedFlags){\nconst len=input.length,spaces=new Uint8Array(len),bare=new Uint8Array(len),gaps=new Uint32Array(len+1),next=new Uint8Array(len+1),after=new Uint8Array(len+1),single=new Uint8Array(len+2),double=new Uint8Array(len+2),run=new Uint8Array(len+1);\nconst space=RegExp(\"\\\\s\",flags+\"y\"),key=RegExp(\"[A-Za-z0-9_-]\",flags+\"y\");\nfor(let i=0;i<len;i++){space.lastIndex=key.lastIndex=i;spaces[i]=space.exec(input)!==null;bare[i]=key.exec(input)!==null;}\ngaps[len]=len;for(let i=len-1;i>=0;i--)gaps[i]=spaces[i]?gaps[i+1]:i;\nfor(let i=len;i>=0;i--){\nconst gap=gaps[i],value=input[gap]===\"=\"?gaps[gap+1]:len;\nafter[i]=(value<len&&input[value]!==\"#\")||(input[gap]===\".\"&&next[gaps[gap+1]]);\nif(i===len)continue;\nrun[i]=bare[i]&&(after[i+1]||run[i+1]);\nsingle[i]=input[i]===\"'\"?after[i+1]:single[i+1];\ndouble[i]=input[i]==='\"'?after[i+1]:double[i+1]||(input[i]===\"\\\\\"&&input[i+1]==='\"'&&double[i+2]);\nnext[i]=run[i]||(input[i]===\"'\"&&single[i+1])||(input[i]==='\"'&&double[i+1]);\n}\ncachedFlags=flags;eligible=next;full=RegExp(source,flags+\"y\");\n}\ncachedInput=input;if(!eligible[at])return null;\nfull.lastIndex=at;return full.exec(input);\n};\nconst shape=Object.assign({},rule);shape.scope=shape.className;delete shape.className;\nownedRecognizers.set(rule,{shape,select,selector:`[A-Za-z0-9_\"'-]`+\"()\".repeat(captures),captures});return rule;\n}\n",
+    "base": "",
+    "candidateSha256": "014b00b6543eb952173770ed9f3cf9259d7c903d899693c2569efb892f2264e6"
+  },
+  {
+    "base": "contains:[a,{className:\"section\",begin:/\\[+/,end:/\\]+/},{\nbegin:n.concat(c,",
+    "candidate": "contains:[a,{className:\"section\",begin:/\\[+/,end:/\\]+/},ownIni({\nbegin:n.concat(c,",
+    "candidateSha256": "28896de7223f849bc0f8bffdecb309e4ab0333be85a441fd87db4a1eba7a537e"
+  },
+  {
+    "base": "className:\"attr\",starts:{end:/$/,contains:[a,o,r,i,s,t]}}]}},grmr_java:e=>{",
+    "candidate": "className:\"attr\",starts:{end:/$/,contains:[a,o,r,i,s,t]}})]}},grmr_java:e=>{",
+    "candidateSha256": "5e1d323474545ec4ce7577100c396ad5f5175d58d4a464e6b97bed8e0dc169e8"
+  }
+]

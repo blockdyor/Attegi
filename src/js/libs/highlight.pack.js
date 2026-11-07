@@ -20,6 +20,32 @@ return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace
 function ownRecognizer(rule,span){
 ownedRecognizers.set(rule,{shape:Object.assign({},rule),span});return rule;
 }
+function ownIni(rule){
+const source=l(rule.begin),captures=p(source);
+let cachedInput,cachedFlags,eligible,full;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,spaces=new Uint8Array(len),bare=new Uint8Array(len),gaps=new Uint32Array(len+1),next=new Uint8Array(len+1),after=new Uint8Array(len+1),single=new Uint8Array(len+2),double=new Uint8Array(len+2),run=new Uint8Array(len+1);
+const space=RegExp("\\s",flags+"y"),key=RegExp("[A-Za-z0-9_-]",flags+"y");
+for(let i=0;i<len;i++){space.lastIndex=key.lastIndex=i;spaces[i]=space.exec(input)!==null;bare[i]=key.exec(input)!==null;}
+gaps[len]=len;for(let i=len-1;i>=0;i--)gaps[i]=spaces[i]?gaps[i+1]:i;
+for(let i=len;i>=0;i--){
+const gap=gaps[i],value=input[gap]==="="?gaps[gap+1]:len;
+after[i]=(value<len&&input[value]!=="#")||(input[gap]==="."&&next[gaps[gap+1]]);
+if(i===len)continue;
+run[i]=bare[i]&&(after[i+1]||run[i+1]);
+single[i]=input[i]==="'"?after[i+1]:single[i+1];
+double[i]=input[i]==='"'?after[i+1]:double[i+1]||(input[i]==="\\"&&input[i+1]==='"'&&double[i+2]);
+next[i]=run[i]||(input[i]==="'"&&single[i+1])||(input[i]==='"'&&double[i+1]);
+}
+cachedFlags=flags;eligible=next;full=RegExp(source,flags+"y");
+}
+cachedInput=input;if(!eligible[at])return null;
+full.lastIndex=at;return full.exec(input);
+};
+const shape=Object.assign({},rule);shape.scope=shape.className;delete shape.className;
+ownedRecognizers.set(rule,{shape,select,selector:`[A-Za-z0-9_"'-]`+"()".repeat(captures),captures});return rule;
+}
 function ownSwift(rule,two){
 const source=l(rule.match||rule.begin),captures=p(source);
 let cachedInput,cachedFlags,eligible,full;
@@ -827,9 +853,9 @@ begin:'"""',end:'"""',relevance:10},{begin:'"',end:'"'},{begin:"'",end:"'"}]
 },o={begin:/\[/,end:/\]/,contains:[a,r,i,s,t,"self"],relevance:0
 },c=n.either(/[A-Za-z0-9_-]+/,/"(\\"|[^"])*"/,/'[^']*'/);return{
 name:"TOML, also INI",aliases:["toml"],case_insensitive:!0,illegal:/\S/,
-contains:[a,{className:"section",begin:/\[+/,end:/\]+/},{
+contains:[a,{className:"section",begin:/\[+/,end:/\]+/},ownIni({
 begin:n.concat(c,"(\\s*\\.\\s*",c,")*",n.lookahead(/\s*=\s*[^#\s]/)),
-className:"attr",starts:{end:/$/,contains:[a,o,r,i,s,t]}}]}},grmr_java:e=>{
+className:"attr",starts:{end:/$/,contains:[a,o,r,i,s,t]}})]}},grmr_java:e=>{
 const n=e.regex,t="[\xc0-\u02b8a-zA-Z_$][\xc0-\u02b8a-zA-Z_$0-9]*",a="(?:(?:\\s*\\[\\s*])+)?",i=t+"<@@@>"+a,r="(?:\\?(?:\\s+(?:extends|super)\\s+"+i+")?|"+i+")",s=Ue("(?:\\s*<\\s*"+r+"(?:\\s*,\\s*"+r+")*\\s*>)?",/<@@@>/g,2),o={
 keyword:["synchronized","abstract","private","var","static","if","const ","for","while","strictfp","finally","protected","import","native","final","void","enum","else","break","transient","catch","instanceof","volatile","case","assert","package","default","public","try","switch","continue","throws","protected","public","private","module","requires","exports","do","sealed","yield","permits","goto","when"],
 literal:["false","true","null"],
