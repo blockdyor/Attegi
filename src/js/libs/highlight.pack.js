@@ -17,6 +17,49 @@ void 0===e.data&&(e.data={}),this.data=e.data,this.isMatchIgnored=!1}
 ignoreMatch(){this.isMatchIgnored=!0}}function t(e){
 return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;")
 }const ownedRecognizers=new WeakMap,compiledRecognizers=new WeakMap;
+function ownPhp(rule,name,slot){
+const raw=rule.match||rule.begin,parts=Array.isArray(raw)?raw.map(l):null;
+const source=parts?h(raw,{joinWith:""}):l(raw),atom=name.slice(0,name.lastIndexOf("{1,}")+"{1,}".length);
+const prefix=parts?parts.slice(0,slot).join(""):slot===-1?"#\\[\\s*\\\\?":"";
+const suffix=name.slice(atom.length)+(parts?parts.slice(slot+1).join(""):""),captures=p(source);
+let cachedInput,cachedFlags,ends,last,prefixRe,recovery,recoveryKey;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const len=input.length,upper=new Uint8Array(len+1),lower=new Uint8Array(len+1);
+const head=RegExp("[A-Z]",flags+"y"),tail=RegExp("[a-z0-9_\\x7f-\\xff]",flags+"y"),after=RegExp(suffix,flags+"y");
+for(let i=0;i<len;i++){head.lastIndex=tail.lastIndex=i;upper[i]=head.test(input);lower[i]=tail.test(input);}
+const end=new Int32Array(len+1).fill(-1),capture=new Int32Array(len+1).fill(-1),aEnd=new Int32Array(len+2).fill(-1),bEnd=new Int32Array(len+2).fill(-1);
+// Rightmost viable endpoints implement greedy runs; loop success precedes its suffix.
+for(let i=len;i>=0;i--){
+const first=input[i]==="\\"?i+1:i;
+let next=-1;
+if(upper[first]){
+const a=aEnd[first+1];
+if(a>=first+2)next=a;
+else next=bEnd[first+1];
+}
+if(next>=0){end[i]=end[next];capture[i]=capture[next]<0?i:capture[next];}
+else{after.lastIndex=i;if(after.test(input))end[i]=i;}
+aEnd[i]=lower[i]&&aEnd[i+1]>=0?aEnd[i+1]:end[i]>=0?i:-1;
+bEnd[i]=upper[i]&&bEnd[i+1]>=0?bEnd[i+1]:end[i]>=0&&upper[i]&&lower[i+1]?i:-1;
+}
+ends=end;last=capture;prefixRe=RegExp(prefix,flags+"y");cachedFlags=flags;recoveryKey=undefined;
+}
+cachedInput=input;
+prefixRe.lastIndex=at;const start=prefixRe.exec(input);if(start===null)return null;
+const begin=prefixRe.lastIndex,cap=last[begin];
+if(cap<0&&slot!==-1)return null;
+// Native recovery has only fixed-width name pieces, retaining every real capture.
+const key=cap<0?"fallback":(cap-begin)+":"+(ends[begin]-cap);
+if(key!==recoveryKey){
+const fixed=cap<0?"(?!)()":"(?:[\\s\\S]{"+(cap-begin)+"})([\\s\\S]{"+(ends[begin]-cap)+"})";
+recovery=RegExp(source.replace(atom,fixed),flags+"y");recoveryKey=key;
+}
+recovery.lastIndex=at;return recovery.exec(input);
+};
+const selector=(slot===-1?"#\\[":parts&&slot===3?"new":"(?:\\\\|[A-Z])")+"()".repeat(captures);
+return ownMode(rule,{select,selector,captures});
+}
 function ownRecognizer(rule,span){
 ownedRecognizers.set(rule,{shape:Object.assign({},rule),span});return rule;
 }
@@ -1310,7 +1353,7 @@ begin:n.concat(/#\[\s*\\?/,n.either(i,r)),beginScope:"meta",end:/]/,
 endScope:"meta",keywords:{literal:u,keyword:["new","array"]},contains:[{
 begin:/\[/,end:/]/,keywords:{literal:u,keyword:["new","array"]},
 contains:["self",...N]},...N,{scope:"meta",variants:[{match:i},{match:r}]}]}
-;return{case_insensitive:!1,keywords:p,
+;for(const [wrapper,leaves,slot] of [[h,h.variants,3],[E,E.variants.slice(2),0],[k.contains[k.contains.length-1],k.contains[k.contains.length-1].variants.slice(0,1),undefined]]){for(const rule of leaves)ownPhp(rule,i,slot);ownMode(wrapper);}ownPhp(k,i,-1);return{case_insensitive:!1,keywords:p,
 contains:[k,e.HASH_COMMENT_MODE,e.COMMENT("//","$"),e.COMMENT("/\\*","\\*/",{
 contains:[{scope:"doctag",match:"@[A-Za-z]+"}]}),{match:/__halt_compiler\(\);/,
 keywords:"__halt_compiler",starts:{scope:"comment",end:e.MATCH_NOTHING_RE,
