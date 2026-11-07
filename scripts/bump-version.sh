@@ -23,7 +23,7 @@ MINOR="${VERSION_PARTS[1]}"
 PATCH="${VERSION_PARTS[2]}"
 
 # Determine new version
-if [ -z "$1" ]; then
+if [[ -z "$1" ]]; then
   echo -e "${YELLOW}Usage: $0 [major|minor|patch|version]${NC}"
   echo "  major: Bump major version (X.0.0)"
   echo "  minor: Bump minor version (x.X.0)"

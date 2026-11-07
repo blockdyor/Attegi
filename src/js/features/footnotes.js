@@ -19,7 +19,7 @@ export function setupFootnotes(container) {
     var text = sup.textContent.trim();
     var match = text.match(/^\[(\d+)\]$/);
     if (match) {
-      footnoteRefs.push({ element: sup, number: parseInt(match[1], 10) });
+      footnoteRefs.push({ element: sup, number: Number.parseInt(match[1], 10) });
     }
   });
 

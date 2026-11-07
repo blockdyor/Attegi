@@ -61,7 +61,7 @@ function printUsage(exitCode) {
 }
 
 function normalizeAdminApiUrl(rawUrl) {
-  const trimmed = String(rawUrl).trim().replace(/\/+$/, '');
+  const trimmed = trimTrailingSlashes(String(rawUrl).trim());
   if (!trimmed) {
     throw new Error('Ghost Admin API URL is empty.');
   }
@@ -101,12 +101,13 @@ function createAdminToken(key) {
 }
 
 function base64url(value) {
-  return Buffer
-    .from(value)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
+  return Buffer.from(value).toString('base64url');
+}
+
+function trimTrailingSlashes(value) {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') end--;
+  return value.slice(0, end);
 }
 
 async function uploadTheme({ adminApiUrl, token, zipFile, zipPath }) {

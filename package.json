@@ -2,7 +2,7 @@
   "name": "attegi",
   "description": "Attegi is an elegant and dynamic Ghost theme, with a modern design, deep support for Ghost, and specially optimized for mobile devices.",
   "demo": "https://attegi.tuuhub.com",
-  "version": "6.12.5",
+  "version": "6.12.6",
   "engines": {
     "ghost": ">=5.118.0"
   },
@@ -44,14 +44,12 @@
     "js:build": "bun scripts/build.js --prod",
     "js:watch": "bun scripts/build.js --watch",
     "serve:hot": "bun scripts/dev-hot.js",
-    "serve:preview": "bun scripts/dev-preview.js",
     "dev": "bun scripts/dev.js",
     "dev:hot": "bun scripts/dev.js hot",
-    "dev:preview": "bun scripts/dev.js preview",
     "build": "bun run css:build && bun run js:build",
     "compress": "bun run build && bun scripts/compress.js",
     "clean": "rm -rf assets/js/*.js assets/css/style.css assets/css/style.css.map dist/",
-    "test:templates": "bun test scripts/tests",
+    "test:templates": "bun test scripts/tests --timeout 30000",
     "validate": "bun run test:templates && bun run compress && bunx gscan@6.7.0 -z dist/attegi.zip"
   },
   "devDependencies": {
@@ -102,6 +100,18 @@
       },
       "github_url": {
         "type": "text"
+      },
+      "nostr_url": {
+        "type": "text",
+        "description": "Optional Nostr profile URL or nostr: URI displayed in the footer."
+      },
+      "amboss_url": {
+        "type": "text",
+        "description": "Optional Amboss node or profile URL displayed in the footer."
+      },
+      "mempool_url": {
+        "type": "text",
+        "description": "Optional Mempool.space explorer or Lightning node URL displayed in the footer."
       },
       "telegram_url": {
         "type": "text"

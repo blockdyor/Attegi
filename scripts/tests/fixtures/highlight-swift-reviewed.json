@@ -1,0 +1,22 @@
+[
+  {
+    "base": "function ownComment(rule,phrase){",
+    "candidate": "function ownSwift(rule,two){\nconst source=l(rule.match||rule.begin),captures=p(source);\nlet cachedInput,cachedFlags,eligible,full;\nconst select=(input,at,flags)=>{\nif(input!==cachedInput||flags!==cachedFlags){\nconst len=input.length,heads=new Uint8Array(len),tails=new Uint8Array(len),spaces=new Uint8Array(len),ends=new Uint32Array(len+1),gaps=new Uint32Array(len+1),next=new Uint8Array(len+1);\nconst head=RegExp(ke,flags+\"y\"),tail=RegExp(xe,flags+\"y\"),space=RegExp(\"\\\\s\",flags+\"y\"),native=RegExp(source,flags+\"y\");\nfor(let i=0;i<len;i++){head.lastIndex=tail.lastIndex=space.lastIndex=i;heads[i]=head.exec(input)!==null;tails[i]=tail.exec(input)!==null;spaces[i]=space.exec(input)!==null;}\nends[len]=gaps[len]=len;\nfor(let i=len-1;i>=0;i--){ends[i]=tails[i]?ends[i+1]:i;gaps[i]=spaces[i]?gaps[i+1]:i;}\nfor(let i=0;i<len;i++)if(heads[i]){const end=ends[i+1],gap=gaps[end];\nif(input[gap]===\":\")next[i]=1;\nelse if(two&&gap>end&&heads[gap]&&input[gaps[ends[gap+1]]]===\":\")next[i]=1;\n}\ncachedFlags=flags;eligible=next;full=native;\n}\ncachedInput=input;if(!eligible[at])return null;\nfull.lastIndex=at;return full.exec(input);\n};\nconst shape=Object.assign({},rule);if(shape.match){shape.begin=shape.match;delete shape.match;}\nownedRecognizers.set(rule,{shape,select,selector:ke,captures});return rule;\n}\nfunction ownComment(rule,phrase){",
+    "candidateSha256": "67c5fc14fecd29745689993cbaa28ca6d2cd36331aacee1e6284819e6e3dbb3d"
+  },
+  {
+    "base": "contains:[\"self\",{\nmatch:b(Oe,/\\s*:/),keywords:\"_|0\",relevance:0\n},...a,A",
+    "candidate": "contains:[\"self\",ownSwift({\nmatch:b(Oe,/\\s*:/),keywords:\"_|0\",relevance:0\n},false),...a,A",
+    "candidateSha256": "bd334f58ca8e7757902730a4b008494512315926630efc218b1045f8565adfa2"
+  },
+  {
+    "base": "contains:[{begin:m(d(b(Oe,/\\s*:/)),d(b(Oe,/\\s+/,Oe,/\\s*:/))),end:/:/,",
+    "candidate": "contains:[ownSwift({begin:m(d(b(Oe,/\\s*:/)),d(b(Oe,/\\s+/,Oe,/\\s*:/))),end:/:/,",
+    "candidateSha256": "6f33252da6570da1d7aa3ca3b2705dc685a0f41848b16f372648055351d91ce7"
+  },
+  {
+    "base": "match:Oe}]},...a,...l,...p,f,k,...T,R,I],endsParent:!0",
+    "candidate": "match:Oe}]},true),...a,...l,...p,f,k,...T,R,I],endsParent:!0",
+    "candidateSha256": "df4c37dfc5a68625b661cf671d5b56d134d6a66e2fccaad7a952e617f66a8fae"
+  }
+]

@@ -15,8 +15,8 @@ export function initGallery() {
     Array.prototype.forEach.call(images, function(image) {
       function getNumericValue(value) {
         if (!value) return null;
-        var numberValue = parseFloat(value);
-        if (isNaN(numberValue)) return null;
+        var numberValue = Number.parseFloat(value);
+        if (Number.isNaN(numberValue)) return null;
         return numberValue > 0 ? numberValue : null;
       }
 
