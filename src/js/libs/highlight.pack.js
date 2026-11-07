@@ -725,7 +725,41 @@ contains:[].concat(_,h,m,p,[...l,{
 begin:"\\b(deque|list|queue|priority_queue|pair|stack|vector|map|set|bitset|multiset|multimap|unordered_map|unordered_set|unordered_multiset|unordered_multimap|array|tuple|optional|variant|function|flat_map|flat_set)\\s*<(?!<)",
 end:">",keywords:b,contains:["self",s]},{begin:e.IDENT_RE+"::",keywords:b},{
 match:[/\b(?:enum(?:\s+(?:class|struct))?|class|struct|union)/,/\s+/,/\w+/],
-className:{1:"keyword",3:"title.class"}}])}},grmr_csharp:e=>{const n={
+className:{1:"keyword",3:"title.class"}}])}},grmr_csharp:e=>{
+function ownRaw(rule){
+const raw=rule.variants[0],shape=Object.assign({},rule,{variants:null},raw);
+shape.scope=shape.className;delete shape.className;
+let cachedInput,cachedFlags,ends,points;
+const select=(input,at,flags)=>{
+if(input!==cachedInput||flags!==cachedFlags){
+const next=new Uint32Array(input.length),close=[];
+const count=flags.includes("u")?new Uint32Array(input.length+1):null;
+if(count)for(let i=0;i<input.length;i++){
+const c=input.charCodeAt(i),p=input.charCodeAt(i-1);
+count[i+1]=count[i]+(c>=56320&&c<=57343&&p>=55296&&p<=56319?0:1);
+}
+for(let i=input.length-1;i>=0;){
+const c=input.charCodeAt(i);
+if(c===34){
+const end=i+1;while(i>=0&&input.charCodeAt(i)===34)i--;
+const start=i+1,width=end-start;
+for(let w=3;w<=width;w++)if(close[w]!==undefined)next[end-w]=close[w]+w;
+for(let w=3;w<=width;w++)close[w]=start;
+}else{if(!flags.includes("s")&&(c===13||c===8232||c===8233))close.length=0;i--;}
+}
+cachedFlags=flags;ends=next;points=count;
+}
+cachedInput=input;
+const end=ends[at];if(!end)return null;
+let begin=at;while(input.charCodeAt(begin)===34)begin++;
+const width=begin-at,stop=end-width,body=points?points[stop]-points[begin]:stop-begin;
+// Fixed widths recover native captures on the original input without retrying backreferences.
+const recovery=RegExp('"""("{'+(width-3)+'})(?!")'+(body?'[\\s\\S]{'+(body-1)+'}([\\s\\S])':'([\\s\\S]){0}')+'"{'+width+'}',flags+"y");
+recovery.lastIndex=at;return recovery.exec(input);
+};
+ownedRecognizers.set(rule,{shape,select,selector:'"""()()',captures:2});return rule;
+}
+const n={
 keyword:["abstract","as","base","break","case","catch","class","const","continue","do","else","event","explicit","extern","finally","fixed","for","foreach","goto","if","implicit","in","interface","internal","is","lock","namespace","new","operator","out","override","params","private","protected","public","readonly","record","ref","return","scoped","sealed","sizeof","stackalloc","static","struct","switch","this","throw","try","typeof","unchecked","unsafe","using","virtual","void","volatile","while"].concat(["add","alias","and","ascending","args","async","await","by","descending","dynamic","equals","file","from","get","global","group","init","into","join","let","nameof","not","notnull","on","or","orderby","partial","record","remove","required","scoped","select","set","unmanaged","value|0","var","when","where","with","yield"]),
 built_in:["bool","byte","char","decimal","delegate","double","dynamic","enum","float","int","long","nint","nuint","object","sbyte","short","string","ulong","uint","ushort"],
 literal:["default","false","null","true"]},t=e.inherit(e.TITLE_MODE,{
@@ -742,9 +776,9 @@ begin:/\{\{/},{begin:/\}\}/},{begin:'""'},c]},u=e.inherit(g,{illegal:/\n/,
 contains:[{begin:/\{\{/},{begin:/\}\}/},{begin:'""'},l]})
 ;c.contains=[g,d,s,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,r,e.C_BLOCK_COMMENT_MODE],
 l.contains=[u,d,o,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,r,e.inherit(e.C_BLOCK_COMMENT_MODE,{
-illegal:/\n/})];const b={variants:[{className:"string",
+illegal:/\n/})];const b=ownRaw({variants:[{className:"string",
 begin:/"""("*)(?!")(.|\n)*?"""\1/,relevance:1
-},g,d,s,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE]},m={begin:"<",end:">",
+},g,d,s,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE]}),m={begin:"<",end:">",
 contains:[{beginKeywords:"in out"},t]
 },p=e.IDENT_RE+"(<"+e.IDENT_RE+"(\\s*,\\s*"+e.IDENT_RE+")*>)?(\\[\\])?",_={
 begin:"@"+e.IDENT_RE,relevance:0};return{name:"C#",aliases:["cs","c#"],
