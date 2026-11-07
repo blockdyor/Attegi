@@ -104,6 +104,53 @@ full.lastIndex=at;return full.exec(input);
 const selector=phrase?"[ ]()()()":"(?:[ ]|(?="+marker+"))()";
 ownedRecognizers.set(rule,{shape:Object.assign({},rule),select,selector,captures});return rule;
 }
+// Private source attestation: only compiler-owned copies may carry these records.
+const modeRecognizers=new WeakMap,variantCaches=new WeakMap;
+function modeShape(rule,deep=false){
+const proto=Object.getPrototypeOf(rule);
+if(proto!==null&&proto!==Object.prototype&&proto!==Array.prototype&&proto!==RegExp.prototype)return null;
+const keys=Reflect.ownKeys(rule),values=[],enumerable=[],nested=[];
+for(const key of keys){
+const descriptor=Object.getOwnPropertyDescriptor(rule,key);
+if(!Object.prototype.hasOwnProperty.call(descriptor,"value"))return null;
+const value=descriptor.value;values.push(value);enumerable.push(descriptor.enumerable);
+if(value&&typeof value==="object"&&(deep||["begin","match","end","scope","beginScope","endScope","variants","cachedVariants"].includes(key))){
+const shape=modeShape(value,key!=="variants"&&key!=="cachedVariants");if(!shape)return null;nested.push(shape);
+}
+}
+const source=proto===RegExp.prototype?rule.source:null,flags=proto===RegExp.prototype?rule.flags:null;
+return()=>Object.getPrototypeOf(rule)===proto&&Reflect.ownKeys(rule).length===keys.length&&
+keys.every((key,i)=>{const descriptor=Object.getOwnPropertyDescriptor(rule,key);return descriptor&&Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.value===values[i]&&descriptor.enumerable===enumerable[i];})&&
+(source===null||rule.source===source&&rule.flags===flags)&&nested.every(shape=>shape());
+}
+function ownMode(rule,recognizer){
+const shape=modeShape(rule);if(shape)modeRecognizers.set(rule,{shape,recognizer});return rule;
+}
+function authenticatedMode(rule){const record=modeRecognizers.get(rule);return record&&record.shape()?record:null;}
+function copyMode(rule,overrides={}){
+const record=authenticatedMode(rule),copy=a(rule,overrides);
+if(record)ownMode(copy,record.recognizer);return copy;
+}
+function variantMode(wrapper,leaf){
+const parent=authenticatedMode(wrapper),record=authenticatedMode(leaf);
+const copy=a(wrapper,{variants:null},leaf);
+if(parent&&record)ownMode(copy,record.recognizer);return copy;
+}
+function cachedModes(wrapper){
+if(wrapper.variants&&!wrapper.cachedVariants){
+wrapper.cachedVariants=wrapper.variants.map(leaf=>variantMode(wrapper,leaf));
+variantCaches.set(wrapper,{cache:wrapper.cachedVariants,shape:modeShape(wrapper)});
+}
+const record=variantCaches.get(wrapper),cache=wrapper.cachedVariants;
+if(!cache||!Array.isArray(cache)||record&&record.cache===cache&&record.shape&&record.shape())return cache;
+// A public cache cannot confer the provenance of a compiler-issued variant.
+return cache.map(rule=>modeRecognizers.has(rule)?a(rule):rule);
+}
+function ownData(rule){
+if(rule==null)return true;
+const proto=Object.getPrototypeOf(rule);
+return(proto===null||proto===Object.prototype)&&Reflect.ownKeys(rule).every(key=>Object.prototype.hasOwnProperty.call(Object.getOwnPropertyDescriptor(rule,key),"value"));
+}
 function ownedRecognizer(rule){
 const record=ownedRecognizers.get(rule);
 const proto=Object.getPrototypeOf(rule);
@@ -112,8 +159,8 @@ Reflect.ownKeys(rule).length===Object.keys(record.shape).length&&
 Reflect.ownKeys(rule).every(key=>{const descriptor=Object.getOwnPropertyDescriptor(rule,key);
 return Object.prototype.hasOwnProperty.call(record.shape,key)&&Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.value===record.shape[key];})?record:null;
 }
-function a(e,...n){const t=Object.create(null);for(const n in e)t[n]=e[n]
-;return n.forEach(e=>{for(const n in e)t[n]=e[n]}),ownedRecognizers.has(e)&&ownedRecognizers.set(t,ownedRecognizers.get(e)),t}const i=e=>!!e.scope
+function a(e,...n){const trusted=ownedRecognizers.has(e)&&ownData(e)&&n.every(ownData),t=Object.create(null);for(const n in e)t[n]=e[n]
+;return n.forEach(e=>{for(const n in e)t[n]=e[n]}),trusted&&ownedRecognizers.set(t,ownedRecognizers.get(e)),t}const i=e=>!!e.scope
 ;class r{constructor(e,n){
 this.buffer="",this.classPrefix=n.classPrefix,e.walk(this)}addText(e){
 this.buffer+=t(e)}openNode(e){if(!i(e))return;const n=((e,{prefix:n})=>{
@@ -286,8 +333,11 @@ if(e.compilerExtensions||(e.compilerExtensions=[]),
 e.contains&&e.contains.includes("self"))throw Error("ERR: contains `self` is not supported at the top-level of a language.  See documentation.")
 ;return e.classNameAliases=a(e.classNameAliases||{}),function t(r,s){const o=r
 ;if(r.isCompiled)return o
-;[R,L,Z,F].forEach(e=>e(r,s)),e.compilerExtensions.forEach(e=>e(r,s));
-const owned=s&&ownedRecognizer(r);
+;const mode=s&&authenticatedMode(r);
+[R,L,Z,F].forEach(e=>e(r,s));
+const normalized=mode&&modeShape(r);
+e.compilerExtensions.forEach(e=>e(r,s));
+const owned=s&&(mode?(normalized&&normalized()?mode.recognizer:null):ownedRecognizer(r));
 
 r.__beforeBegin=null,[D,I,B].forEach(e=>e(r,s)),r.isCompiled=!0;let c=null
 ;return"object"==typeof r.keywords&&r.keywords.$pattern&&(r.keywords=Object.assign({},r.keywords),
@@ -298,10 +348,9 @@ s&&(r.begin||(r.begin=/\B|\b/),o.beginRe=n(o.begin),r.end||r.endsWithParent||(r.
 r.end&&(o.endRe=n(o.end)),
 o.terminatorEnd=l(o.end)||"",r.endsWithParent&&s.terminatorEnd&&(o.terminatorEnd+=(r.end?"|":"")+s.terminatorEnd)),
 r.illegal&&(o.illegalRe=n(r.illegal)),
-r.contains||(r.contains=[]),r.contains=[].concat(...r.contains.map(e=>(e=>(e.variants&&!e.cachedVariants&&(e.cachedVariants=e.variants.map(n=>a(e,{
-variants:null},n))),e.cachedVariants?e.cachedVariants:Q(e)?a(e,{
-starts:e.starts?a(e.starts):null
-}):Object.isFrozen(e)?a(e):e))("self"===e?r:e))),r.contains.forEach(e=>{t(e,o)
+r.contains||(r.contains=[]),r.contains=[].concat(...r.contains.map(e=>(e=>cachedModes(e)|| (Q(e)?copyMode(e,{
+starts:e.starts?copyMode(e.starts):null
+}):Object.isFrozen(e)?copyMode(e):e))("self"===e?r:e))),r.contains.forEach(e=>{t(e,o)
 }),r.starts&&t(r.starts,s),owned&&compiledRecognizers.set(o,owned.select?{select:owned.select,selector:owned.selector,captures:owned.captures}:{span:owned.span}),o.matcher=(e=>{const n=new i
 ;return e.contains.forEach(e=>n.addRule(compiledRecognizers.has(e)?(compiledRecognizers.get(e).selector||/[_A-Za-z]/):e.begin,{rule:e,type:"begin"
 })),e.terminatorEnd&&n.addRule(e.terminatorEnd,{type:"end"
