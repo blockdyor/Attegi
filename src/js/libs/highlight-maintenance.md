@@ -100,7 +100,7 @@ The C-family subset covers only C/C++/Objective-C includes and the C#
 function end. Include indexing preserves JS-dot line boundaries and sibling
 priority. The C# end consumes the complete accepted whitespace-plus-delimiter
 lexeme, avoiding the rejected early-pop/root-reparse regression; failed runs
-remain buffered inside the function. Original raw strings (2b) remain unrepaired;
+remain buffered inside the function. Raw strings (2b) now use the private selection described below;
 no shared activation-specific closing pointer is used. An unchanged root
 attribute scan can still be nonlinear after a delimiter; this is not original2a
 and is not claimed fixed.
@@ -111,7 +111,7 @@ HTML/relevance/captures and tested parent/emitter behavior agree;
 consumers wrapping internal `on:end` callbacks through `getLanguage` observe
 changed raw `match[0]`/`match.index` spans (indentation is now body text). This is
 not complete internal callback-event identity. The theme uses `highlightElement`
-and does not wrap these callbacks. PHP class-name path2q remains unrepaired.
+and does not wrap these callbacks. PHP class-name path2q is covered below.
 Both focused packets reconstruct the exact original before executing either VM.
 
 Shell end eligibility uses a one-input byte index matching multiline JavaScript
@@ -119,7 +119,8 @@ whitespace/end-of-line semantics. Accepted ends still consume one UTF-16 code
 unit and preserve the Bash buffer. The new `on:end` hook and O(input length)
 cache are observable; reentry may rebuild the cache. Neither arbitrary modified
 Shell grammars nor unrelated Bash paths receive a universal linearity guarantee.
-Java Javadoc (2h) and Java method (2i) remain unchanged and unrepaired.
+Java Javadoc (2h) has the caller-context repair below; Java method (2i) now uses
+the private declaration selector described in the final section.
 
 ## Native matcher metadata ownership
 
@@ -278,3 +279,44 @@ locally; other original S8786 findings still require triage/fixes and a fresh
 Sonar analysis is required to establish actual issue status. The exact prepatch
 oracle is retained through original-factory excerpts and inverse grammar,
 statement and sort edits, without changing the pinned checksum.
+
+## Final six original regex repairs and variant ownership
+
+These repairs cover bundled execution paths. Public grammar regexes remain
+available for compatibility and are not certified safe standalone. Ranges refer
+to the original scanner baseline above:
+
+| ID suffix | Rule | Original range | Local change |
+| --- | --- | --- | --- |
+| 2b | S8786 | 536:6–536:33 | C# raw strings: quote-run index and fixed-width native capture recovery. |
+| 2f | S8786 | 620:48–620:70 | INI numbers: indexed eligibility, native optional-sign captures and ordinary-number fallback. |
+| 2g | S8786 | 631:51–631:66 | INI assignment keys: private index and native full-match recovery. |
+| 2i | S8786 | 653:31–653:42 | Java declarations: indexed suffix selection under the current parent's flags. |
+| 2q | S8786 | 844:111–844:183 | All six PHP Pascal-name paths, including unguarded attribute fallback: greedy name recurrence and native capture recovery. |
+| 3C | S8786 | 1242:34–1242:69 | YAML bare/single/double-quoted attributes: indexed last eligible colon and original greedy spans. |
+
+Private wrapper/leaf provenance survives variant expansion and scope
+normalization. Descriptor checks precede normalized-field reads; accessor-returned
+or raw-cache substitutes do not gain ownership. Only authenticated wrappers
+receive compiler-cache-array provenance snapshots. Ordinary public caches keep
+concat semantics and indexed read counts without public `.map` calls or recursive
+inspection of unused metadata. Cyclic/Proxy scope values, hostile map/species
+getters, raw-cache laundering and frozen authentic leaves have regression controls.
+
+Java validates the original combined matcher under the current selecting flags
+before substituting a selector, preserving compile errors even on empty input.
+Recovery supplies native text, meaningful captures, index and input before
+callbacks. Rejection, match mutation, shared data, safe/debug errors and scoped
+reentry remain checked. Reentry can rebuild indexes; these bounds do not imply
+universal complexity for arbitrary callbacks or the entire grammar.
+
+`highlight-batch-reviewed.json` pins unique inverses back to the frozen pre-batch
+source before the existing INI/Swift/COMMENT/original chain. The original checksum
+and 29 historical inverse entries are unchanged. The historical INI-only
+35-factory byte invariant masks only later batch deltas; behavioral checks execute
+the full combined candidate. `highlight-batch-owned.test.js` contributes 96
+mixed-language/current-flag/public-cache comparison pairs per runtime.
+Full Bun 1.3.13 and 1.4.2 runs each passed 346 tests with zero failures and 123904
+expectations on source SHA256
+`114fed394b8056ff3328df2c781a73e089220a3c96b8ea9d251c90a93c0ec6a5`.
+These source/test-tree results are not Sonar dispositions or release approval.
