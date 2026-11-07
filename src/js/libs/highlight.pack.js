@@ -901,7 +901,34 @@ end:/\)/,keywords:o,relevance:0,contains:[e.C_BLOCK_COMMENT_MODE],endsParent:!0}
 relevance:0},{className:"doctag",begin:"@[A-Za-z]+"}]});
 // Buffer failed words without consuming interior COMMENT markers or changing the successful word@ guard.
 d.contains.push({begin:n.concat('(?:(?!',e.C_BLOCK_COMMENT_MODE.contains[0].begin,')\\w)+'),skip:!0,relevance:0});
-return{name:"Java",aliases:["jsp"],keywords:o,illegal:/<\/|#/,
+const javaRules=new WeakMap;
+function ownJava(rule){
+const shape=Object.assign({},rule);R(shape);Z(shape);
+const source=shape.begin,captures=p(source);
+let input,indexFlags,full,tail,rejectedStart=-1,rejectedEnd=-1;
+const select=(value,at,flags)=>{
+if(value!==input||flags!==indexFlags){
+full=RegExp(source,flags+"y");tail=RegExp("[\\xc0-\\u02b8a-zA-Z_$0-9]+",flags+"y");
+indexFlags=flags;rejectedStart=rejectedEnd=-1;
+}
+input=value;if(at>=rejectedStart&&at<rejectedEnd)return null;
+full.lastIndex=at;const match=full.exec(value);
+// A failed type suffix is identical at every later start in this identifier run.
+if(match===null){tail.lastIndex=at;const run=tail.exec(value);rejectedStart=at;rejectedEnd=at+(run?run[0].length:1);}
+return match;
+};
+javaRules.set(rule,{shape,select,selector:"[\\xc0-\\u02b8a-zA-Z_$]"+"()".repeat(captures),captures});return rule;
+}
+function javaOwnedExtension(rule){
+const entry=javaRules.get(rule);if(!entry)return;
+const data=(actual,expected)=>{
+if(Object.getPrototypeOf(actual)!==Object.getPrototypeOf(expected)||Reflect.ownKeys(actual).length!==Reflect.ownKeys(expected).length)return false;
+return Reflect.ownKeys(expected).every(key=>{const a=Object.getOwnPropertyDescriptor(actual,key),b=Object.getOwnPropertyDescriptor(expected,key);
+return a&&Object.prototype.hasOwnProperty.call(a,"value")&&(a.value===b.value||(key==="beginScope"||key==="_emit")&&a.value&&typeof a.value==="object"&&data(a.value,b.value));});
+};
+if(data(rule,entry.shape))ownedRecognizers.set(rule,{...entry,shape:Object.assign({},rule)});
+}
+return{name:"Java",aliases:["jsp"],compilerExtensions:[javaOwnedExtension],keywords:o,illegal:/<\/|#/,
 contains:[d,{
 begin:/import java\.[a-z]+\./,keywords:"import",relevance:2
 },e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE,{begin:/"""/,end:/"""/,
@@ -909,15 +936,15 @@ className:"string",contains:[e.BACKSLASH_ESCAPE]
 },e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,{
 match:[/\b(?:class|interface|enum|extends|implements|new)/,/\s+/,t],className:{
 1:"keyword",3:"title.class"}},{match:/non-sealed/,scope:"keyword"},{
-beginKeywords:"new throw return else yield assert",relevance:0},{
+beginKeywords:"new throw return else yield assert",relevance:0},ownJava({
 begin:[t,n.concat(s,a,/\s+/),t,a,/\s*/,/=(?!=)/],className:{1:"type",
-3:"variable",6:"operator"}},{begin:[/record/,/\s+/,t],className:{1:"keyword",
-3:"title.class"},contains:[l,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},{
+3:"variable",6:"operator"}}),{begin:[/record/,/\s+/,t],className:{1:"keyword",
+3:"title.class"},contains:[l,e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},ownJava({
 begin:[t,n.concat(s,a,/\s+/),t,/\s*(?=\()/],className:{1:"type",
 3:"title.function"},keywords:o,contains:[{className:"params",begin:/\(/,
 end:/\)/,keywords:o,relevance:0,
 contains:[c,e.APOS_STRING_MODE,e.QUOTE_STRING_MODE,je,e.C_BLOCK_COMMENT_MODE]
-},e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]},je,c]}},grmr_javascript:ge,
+},e.C_LINE_COMMENT_MODE,e.C_BLOCK_COMMENT_MODE]}),je,c]}},grmr_javascript:ge,
 grmr_json:e=>{const n=["true","false","null"],t={scope:"literal",
 beginKeywords:n.join(" ")};return{name:"JSON",aliases:["jsonc","json5"],
 keywords:{literal:n},contains:[{className:"attr",
