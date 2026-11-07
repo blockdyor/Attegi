@@ -137,14 +137,17 @@ const copy=a(wrapper,{variants:null},leaf);
 if(parent&&record)ownMode(copy,record.recognizer);return copy;
 }
 function cachedModes(wrapper){
+const parent=authenticatedMode(wrapper);
 if(wrapper.variants&&!wrapper.cachedVariants){
 wrapper.cachedVariants=wrapper.variants.map(leaf=>variantMode(wrapper,leaf));
-variantCaches.set(wrapper,{cache:wrapper.cachedVariants,shape:modeShape(wrapper)});
+if(parent)variantCaches.set(wrapper,{cache:wrapper.cachedVariants,shape:modeShape(wrapper.cachedVariants)});
 }
 const record=variantCaches.get(wrapper),cache=wrapper.cachedVariants;
 if(!cache||!Array.isArray(cache)||record&&record.cache===cache&&record.shape&&record.shape())return cache;
-// A public cache cannot confer the provenance of a compiler-issued variant.
-return cache.map(rule=>modeRecognizers.has(rule)?a(rule):rule);
+// Read a public cache exactly as the compiler's ordinary concat, never its methods.
+const copies=[].concat(cache);
+for(let i=0;i<copies.length;i++)if(authenticatedMode(copies[i]))copies[i]=a(copies[i]);
+return copies;
 }
 function ownData(rule){
 if(rule==null)return true;
