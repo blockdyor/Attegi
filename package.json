@@ -2,7 +2,7 @@
   "name": "attegi",
   "description": "Attegi is an elegant and dynamic Ghost theme, with a modern design, deep support for Ghost, and specially optimized for mobile devices.",
   "demo": "https://attegi.tuuhub.com",
-  "version": "6.12.5",
+  "version": "6.12.6",
   "engines": {
     "ghost": ">=5.118.0"
   },
@@ -44,10 +44,8 @@
     "js:build": "bun scripts/build.js --prod",
     "js:watch": "bun scripts/build.js --watch",
     "serve:hot": "bun scripts/dev-hot.js",
-    "serve:preview": "bun scripts/dev-preview.js",
     "dev": "bun scripts/dev.js",
     "dev:hot": "bun scripts/dev.js hot",
-    "dev:preview": "bun scripts/dev.js preview",
     "build": "bun run css:build && bun run js:build",
     "compress": "bun run build && bun scripts/compress.js",
     "clean": "rm -rf assets/js/*.js assets/css/style.css assets/css/style.css.map dist/",

@@ -5,31 +5,9 @@ const path = require('node:path');
 const vm = require('node:vm');
 const {spawn, spawnSync} = require('node:child_process');
 const {test} = require('node:test');
-const Handlebars = require('handlebars');
 
 const root = path.resolve(__dirname, '../..');
 const source = name => fs.readFileSync(path.join(root, 'scripts', name), 'utf8');
-
-function previewContext() {
-  const hbs = Handlebars.create();
-  const context = vm.createContext({
-    require(name) {
-      if (name === 'handlebars') return hbs;
-      if (name === 'browser-sync') return {create: () => ({})};
-      if (name === 'http') return {createServer: () => ({listen() {}})};
-      return require(name);
-    },
-    process: {cwd: () => root, env: {GHOST_CONTENT_API_URL: 'https://ghost.example', GHOST_CONTENT_API_KEY: 'test'}, on() {}},
-    console, URL, Buffer
-  });
-  vm.runInContext(source('dev-preview.js'), context);
-  return {context, hbs};
-}
-
-const {context: preview, hbs} = previewContext();
-function evaluate(expression, timeout = 1000) {
-  return vm.runInContext(expression, preview, {timeout});
-}
 
 // Execute the real declarations without the upload/activation entry point.
 const deploy = vm.createContext({Buffer, require});
@@ -53,38 +31,6 @@ test('deploy URL suffix and base64 padding handling stay linear on long input', 
   assert.equal(vm.runInContext('base64url("fo")', deploy), 'Zm8');
   assert.equal(vm.runInContext('base64url("foo")', deploy), 'Zm9v');
   assert.equal(vm.runInContext('base64url(Buffer.from([251, 255]))', deploy), '-_8');
-});
-
-test('preview normalizes long URLs and route slash runs without rescanning suffixes', () => {
-  preview.longUrl = `ghost.example/${'/'.repeat(100000)}tail`;
-  assert.equal(evaluate('normalizeUrl(longUrl)'), `https://${preview.longUrl}`);
-  preview.longPath = `/${'/'.repeat(100000)}tail`;
-  assert.equal(evaluate('normalizePathname(longPath)'), preview.longPath);
-  assert.equal(evaluate('normalizeUrl(" https://ghost.example/blog/// ")'), 'https://ghost.example/blog');
-  assert.equal(evaluate('normalizePathname("/tag/news///")'), '/tag/news');
-  assert.equal(evaluate('normalizePathname("////")'), '/');
-});
-
-test('preview strips complete tags but preserves empty and unfinished markup', () => {
-  assert.equal(evaluate('stripHtml("Hello <b>world</b> <> <<em> end <unfinished")'), 'Hello  world  <>   end <unfinished');
-  preview.html = '<'.repeat(100000);
-  assert.equal(evaluate('stripHtml(html)'), preview.html);
-});
-
-test('preview slug boundaries handle long separators and preserve navigation names', () => {
-  preview.label = `Hello${'!'.repeat(100000)}`;
-  assert.equal(evaluate('slugify(label)'), 'hello');
-  assert.equal(evaluate('slugify(" --Hello, WORLD!-- ")'), 'hello-world');
-  assert.equal(evaluate('slugify("!!!")'), '');
-});
-
-test('post and page models render identical local and canonical URL shapes', () => {
-  for (const page of [false, true]) {
-    const model = evaluate(`decoratePost({slug: 'hello-world', html: '<p>Hello</p>'}, 'https://ghost.example/blog/', ${page})`);
-    const html = hbs.compile('<a href="{{url}}">{{url absolute=true}}</a>')(model);
-    assert.equal(html, '<a href="/hello-world/">https://ghost.example/hello-world/</a>');
-    assert.equal(model.canonical_url, 'https://ghost.example/hello-world/');
-  }
 });
 
 function runner({streamFailure, exitFailure = false, shutdownFailure = false, spawnFailure = false, holdExit = false} = {}) {

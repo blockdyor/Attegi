@@ -17,9 +17,8 @@ bundled by esbuild. Tooling runs on Bun. `CLAUDE.md` is a symlink to this file.
 
 ```bash
 bun install
-bun run dev:preview   # Local .hbs render + remote Content API content, http://localhost:3020
 bun run dev:hot       # BrowserSync proxy over a real Ghost (GHOST_DEV_URL), http://localhost:3010
-bun run dev           # Asset watchers only: sass, tailwind, esbuild
+bun run dev           # Asset watchers only: SCSS and JS
 bun run build         # Production CSS + JS
 bun run test:templates  # Handlebars render tests in scripts/tests
 bun run validate      # tests, build, zip to dist/attegi.zip, run GScan
@@ -30,11 +29,8 @@ There is no linter. `bun run validate` is the floor for every change.
 - Partial parameters and bare `{{names}}` must not reuse a Ghost helper name
   (`link_class`, `url`, `title`, ...): Handlebars calls the helper first.
 
-- `dev:preview` is the default loop for template, CSS, and JS work. It needs
-  `GHOST_CONTENT_API_URL` and `GHOST_CONTENT_API_KEY` in `.env.local`
-  (see `.env.example`). It is a renderer approximation in
-  `scripts/dev-preview.js`: portal, comments, search, and Ghost image transforms
-  are stubbed. When a template uses a new Ghost helper, teach the renderer too.
+- Use `dev:hot` against a real development Ghost instance, or Docker for local
+  template rendering. The approximate standalone preview renderer was removed.
 - `dev:hot` gives real Ghost output, but template edits only show up if the
   target Ghost has this theme installed. Local `assets/` are served over it.
 - Visual changes: check light and dark, and the 420 / 480 / 640 / 960 breakpoints.
@@ -58,7 +54,7 @@ There is no linter. `bun run validate` is the floor for every change.
   sampling only works for same-origin images; the baseline scrim must carry
   contrast on its own.
 - `package.json` `config.custom` defines the Ghost admin settings read as
-  `@custom.*`. The preview renderer reads defaults from there too.
+  `@custom.*`.
 - `locales/*.json` back `{{t "..."}}`. A missing key falls back to the English
   key text. `en`, `zh`, and `zh-Hant` are complete; some older locales lag.
   File names must match the Ghost admin locale code exactly (Ghost does
