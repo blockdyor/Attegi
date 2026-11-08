@@ -37,6 +37,7 @@
 									{{!-- "xs" is not a configured image size (see package.json config.image_sizes),
 									     so img_url would silently fall back to the original, full-resolution
 									     file for every avatar; "s" (320w) is the smallest size actually defined. --}}
+									<source srcset="{{img_url profile_image size="s" format="webp"}}" type="image/webp" />
 									<img class="author-profile-image" src="{{img_url profile_image size="s" quality="80"}}" alt="" loading="lazy" decoding="async" />
 								</picture>
 							</a>
@@ -197,8 +198,6 @@
 	</article>
 </div>
 
-{{/post}}
-
 {{!-- The #contentFor helper here will send everything inside it up to the matching #block helper found in default.hbs --}}
 {{#if feature_image}}
 {{#contentFor "head"}}
@@ -209,6 +208,7 @@
 	imagesizes="100vw">
 {{/contentFor}}
 {{/if}}
+{{/post}}
 {{#contentFor "scripts"}}
 <script defer src="{{asset "js/tocbot.min.js"}}"></script>
 <script defer src="{{asset "js/post.js"}}" data-highlight="{{asset "js/highlight.pack.js"}}"></script>
