@@ -417,7 +417,8 @@ own cover-active case is already covered there, so this attribute only needs the
 			<div class="nav-bar">
 				<div class="nav-brand">
 					{{#if @site.logo}}
-						<a class="logo" href="{{@site.url}}" title="{{t "Home"}}"><img src="{{img_url @site.logo size="s"}}" alt="{{t "Logo"}}" /></a>
+						{{!-- shortcut: blockdyor's 320x75 wordmark; update dimensions if its aspect ratio changes. --}}
+						<a class="logo" href="{{@site.url}}" title="{{t "Home"}}"><img src="{{img_url @site.logo size="s"}}" alt="{{t "Logo"}}" width="320" height="75" /></a>
 					{{else}}
 						<a class="wordmark" href="{{@site.url}}">{{@site.title}}</a>
 					{{/if}}
@@ -610,8 +611,8 @@ own cover-active case is already covered there, so this attribute only needs the
 		</section>
 	</div>
 
-	{{!-- Load basic scripts (no defer, placed before </body> for reliability) --}}
-	<script src="{{asset "js/site.js"}}"></script>
+	{{!-- Defer site initialization until the document is parsed. --}}
+	<script defer src="{{asset "js/site.js"}}"></script>
 	<script>
 		// Load the JetBrains Mono webfont only on pages that actually render
 		// a code block; every other page skips the request entirely.
@@ -623,9 +624,10 @@ own cover-active case is already covered there, so this attribute only needs the
 			document.head.appendChild(stylesheet);
 		})();
 	</script>
-	<script>
+	<script data-lightbox-css="{{asset "css/glightbox.min.css"}}" data-lightbox-js="{{asset "js/glightbox.min.js"}}">
 		// Conditionally load GLightbox only for gallery images
 		(function() {
+			var lightboxScript = document.currentScript;
 			function initGLightbox() {
 				// Gallery images and single kg-image-card images are both lightbox-able.
 				var galleryImages = document.querySelectorAll('.kg-gallery-image img, .kg-image-card > img');
@@ -679,10 +681,18 @@ own cover-active case is already covered there, so this attribute only needs the
 					return largest || src;
 				}
 
-				// Load CSS
+				// Gallery styles must not block the article's first paint.
+				var cssReady = false;
+				var initialized = false;
 				var css = document.createElement('link');
 				css.rel = 'stylesheet';
-				css.href = '/assets/css/glightbox.min.css';
+				css.media = 'print';
+				css.href = lightboxScript.getAttribute('data-lightbox-css');
+				css.onload = function() {
+					css.media = 'all';
+					cssReady = true;
+					initLightboxWhenReady();
+				};
 				document.head.appendChild(css);
 
 				// Wrap gallery and single-image-card images
@@ -716,29 +726,31 @@ own cover-active case is already covered there, so this attribute only needs the
 					}
 				});
 
-				// Load JS
+				function initLightboxWhenReady() {
+					if (!cssReady || initialized || typeof GLightbox === 'undefined') return;
+					initialized = true;
+					GLightbox({
+						selector: '.glightbox',
+						type: 'image',
+						touchNavigation: true,
+						loop: true,
+						closeOnOutsideClick: true,
+						openEffect: 'fade',
+						closeEffect: 'fade',
+						zoomable: true,
+						draggable: true,
+						dragAutoSnap: true,
+						preload: true,
+						// Enhanced touch settings for better mobile experience
+						touchFollowAxis: true,
+						moreLength: 0
+					});
+				}
+
+				// Links retain their native image destination if either asset fails.
 				var script = document.createElement('script');
-				script.src = '/assets/js/glightbox.min.js';
-				script.onload = function() {
-					if (typeof GLightbox !== 'undefined') {
-						var lightbox = GLightbox({
-							selector: '.glightbox',
-							type: 'image',
-							touchNavigation: true,
-							loop: true,
-							closeOnOutsideClick: true,
-							openEffect: 'fade',
-							closeEffect: 'fade',
-							zoomable: true,
-							draggable: true,
-							dragAutoSnap: true,
-							preload: true,
-							// Enhanced touch settings for better mobile experience
-							touchFollowAxis: true,
-							moreLength: 0
-						});
-					}
-				};
+				script.src = lightboxScript.getAttribute('data-lightbox-js');
+				script.onload = initLightboxWhenReady;
 				document.body.appendChild(script);
 			}
 

@@ -205,7 +205,7 @@ $toc-breakpoint: 1200px;
   color: var(--color-content-secondary);
   text-decoration: none;
   border-left: 1px solid transparent;
-  transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  transition: none;
   word-break: break-word;
 
   &:hover {

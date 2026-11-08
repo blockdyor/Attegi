@@ -11,12 +11,14 @@ import { detectContentLanguage } from '../features/lang-detect.js';
 import { initToggleCards } from '../features/toggle-cards.js';
 import { initPoemCards } from '../features/poem-cards.js';
 import { setupCoverBrightnessDetection } from '../features/cover-detect.js';
+import { setupContentCards } from '../features/content-cards.js';
 
 onReady(function() {
   var pageContent = qs('.post-content');
   if (!pageContent) return;
 
   detectContentLanguage(pageContent);
+  setupContentCards(pageContent);
   initPoemCards();
 
   // Valid here because this file loads as a deferred classic script:

@@ -1,3 +1,4 @@
+const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const {test} = require('node:test');
@@ -5,6 +6,26 @@ const sass = require('sass');
 const postcss = require('postcss');
 const sassRoot = path.resolve(process.env.THEME_ROOT || path.resolve(__dirname, '../..'), 'src/sass');
 const css = postcss.parse(sass.compile(path.join(sassRoot, 'style.scss'), {style: 'compressed', silenceDeprecations: ['import']}).css);
+
+test('the blockdyor wordmark reserves its measured 320 by 75 intrinsic ratio', () => {
+  const template = fs.readFileSync(path.resolve(sassRoot, '../../default.hbs'), 'utf8');
+  const image = template.match(/<img src="{{img_url @site.logo size="s"}}"[^>]*>/)[0];
+  assert.match(image, /\bwidth="320"/);
+  assert.match(image, /\bheight="75"/);
+});
+
+test('TOC active-link colors do not animate non-composited paint properties', () => {
+  const declarations = {};
+  css.walkRules(rule => {
+    if (['.toc-link', '.toc-link.is-active'].includes(rule.selector)) {
+      declarations[rule.selector] = Object.fromEntries(rule.nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
+    }
+  });
+  assert.equal(declarations['.toc-link'].transition, 'none');
+  assert.equal(declarations['.toc-link'].color, 'var(--color-content-secondary)');
+  assert.equal(declarations['.toc-link.is-active'].color, 'var(--color-content-lead)');
+  assert.equal(declarations['.toc-link.is-active']['border-left-color'], 'var(--color-content-lead)');
+});
 
 test('the monochrome navigation logo is dark on light surfaces', () => {
   let filter;

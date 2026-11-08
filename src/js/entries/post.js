@@ -18,12 +18,14 @@ import { initPoemCards } from '../features/poem-cards.js';
 import { detectContentLanguage } from '../features/lang-detect.js';
 import { initToggleCards } from '../features/toggle-cards.js';
 import { setupBackToTop } from '../features/back-to-top.js';
+import { setupContentCards } from '../features/content-cards.js';
 
 onReady(function() {
   var postContent = qs('.post-content');
   if (!postContent) return;
 
   detectContentLanguage(postContent);
+  setupContentCards(postContent);
 
   // Runs first and synchronously: unlike the other features below it needs
   // no external script, so doing it first cuts the flash of raw `[!poem]`

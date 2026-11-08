@@ -1771,6 +1771,12 @@ textarea {
 		}
 	}
 
+	.kg-bookmark-metadata .kg-bookmark-author,
+	.kg-bookmark-metadata .kg-bookmark-publisher {
+		color: var(--color-content-main);
+		opacity: 1;
+	}
+
 	// KG Toggle - Redesigned with larger border radius
 
 	.kg-toggle-card {
@@ -2156,12 +2162,13 @@ textarea {
 			grid-area: desc;
 			font-size: var(--font-size-2xs);
 			line-height: 1.6;
-			color: var(--color-content-secondary);
+			color: var(--color-content-main);
 			margin: 0;
 			padding: 0;
 
 			p, ol, ul {
 				margin: 0 0 0.8rem;
+				opacity: 1;
 
 				&:last-child {
 					margin-bottom: 0;
