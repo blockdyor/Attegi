@@ -1,21 +1,38 @@
 <div align="center">
 
-# Attegi
+# Attegi for blockdyor
 
 [![Ghost 5+](https://img.shields.io/badge/Ghost-5%2B-000?logo=ghost&logoColor=white)](https://ghost.org/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
-[![Build (esbuild)](https://github.com/bunizao/Attegi/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/bunizao/Attegi/actions/workflows/build.yml)
-[![Demo](https://img.shields.io/badge/demo-attegi.tuuhub.com-4F46E5)](https://attegi.tuuhub.com)
+[![Build (esbuild)](https://github.com/blockdyor/Attegi/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/blockdyor/Attegi/actions/workflows/build.yml)
+[![Website](https://img.shields.io/badge/website-blockdyor.com-4F46E5)](https://blockdyor.com)
 
-A modern, elegant Ghost theme focused on clean typography, mobile readability, and deep support for [Ghost](https://ghost.org).
+A customized Ghost theme maintained for [blockdyor](https://blockdyor.com), forked from [Attegi by bunizao](https://github.com/bunizao/Attegi). This fork adds accessibility, PageSpeed, native Ghost integration and security fixes while retaining the original theme's design and upstream credits.
 
-**[View Live Demo →](https://attegi.tuuhub.com)**
+**[Visit blockdyor →](https://blockdyor.com)** · **[Download this fork](https://github.com/blockdyor/Attegi/releases/latest)** · [Original upstream demo](https://attegi.tuuhub.com)
 
 [简体中文](README_zh.md)
 
-<img src="screenshots/homepage-dark.png" alt="Attegi Theme Preview" width="700">
+<img src="screenshots/homepage-dark.png" alt="Upstream Attegi Theme Preview" width="700">
+
+Preview from upstream Attegi; blockdyor's changes are described below.
 
 </div>
+
+---
+
+## What changed in the blockdyor fork
+
+- **Native Ghost integration:** Portal and Search light/dark iframe fixes while preserving Ghost's own controls and comments.
+- **Accessibility:** native product/bookmark text contrast, product heading semantics and contextual alternatives for otherwise unnamed product images, without overwriting authored alternatives.
+- **PageSpeed work:** responsive cover preloads, native WebP author avatars, deferred site JavaScript and nonblocking gallery styles with working native image-link fallbacks.
+- **Light/dark presentation:** surface-aware navigation-logo visibility and readable accent/glass-button text.
+- **Advertising and footer:** responsive ad-layout fixes and blockdyor's social links, retaining RSS and X before the other platforms.
+- **Security and regression coverage:** source hardening and syntax-highlighter repairs, with automated compatibility tests and SonarCloud checks.
+
+These are changes maintained in this fork, not claims about the upstream project. PageSpeed scores depend on the page, hosting, content and third-party resources; this fork does not guarantee a perfect score or whole-site accessibility conformance.
+
+The fork remains under **AGPL-3.0**. Original notices and third-party licenses are retained; this is not a claim that blockdyor created the original Attegi theme.
 
 ---
 
@@ -51,7 +68,7 @@ A modern, elegant Ghost theme focused on clean typography, mobile readability, a
 
 ## Performance
 
-Attegi achieves excellent scores on [Google PageSpeed Insights](https://pagespeed.web.dev/analysis/https-attegi-tutuis-me/jhk5dugrrn):
+The following historical scores are from the [upstream Attegi demo report](https://pagespeed.web.dev/analysis/https-attegi-tutuis-me/jhk5dugrrn), not a measurement of this blockdyor fork:
 
 | Metric | Mobile | Desktop |
 |--------|--------|---------|
@@ -317,6 +334,8 @@ Attegi/
 ---
 
 ## Support
+
+For this fork, use [blockdyor/Attegi issues](https://github.com/blockdyor/Attegi/issues). The resources and paid-support contact below belong to the original upstream project.
 
 - **Docs**: [Ghost Theme Documentation](https://ghost.org/docs/themes/)
 - **Issues**: [GitHub Issues](https://github.com/bunizao/Attegi/issues)
