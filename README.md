@@ -23,6 +23,8 @@ Preview from upstream Attegi; blockdyor's changes are described below.
 
 ## What changed in the blockdyor fork
 
+Changes maintained by blockdyor through v6.12.10, released November 8, 2026:
+
 - **Native Ghost integration:** Portal and Search light/dark iframe fixes while preserving Ghost's own controls and comments.
 - **Accessibility:** native product/bookmark text contrast, product heading semantics and contextual alternatives for otherwise unnamed product images, without overwriting authored alternatives.
 - **PageSpeed work:** responsive cover preloads, native WebP author avatars, deferred site JavaScript and nonblocking gallery styles with working native image-link fallbacks.
