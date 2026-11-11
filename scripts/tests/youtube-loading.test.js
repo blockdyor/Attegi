@@ -61,9 +61,9 @@ function fixture(src, extra = {}) {
   return {frame, caption, figure, ad, container};
 }
 
-test('the actual nocookie DOM player retains its attributes and intrinsic ratio when wrapped', () => {
-  const state = fixture('https://www.youtube-nocookie.com/embed/JjNuCHE4EGE?feature=oembed');
-  const attributes = {...state.frame.attribs};
+test('the legacy player retains its attributes and intrinsic ratio when wrapped', () => {
+  const state = fixture('https://www.youtube.com/embed/JjNuCHE4EGE?feature=oembed');
+  const attributes = {...state.frame.attribs, src: 'https://www.youtube-nocookie.com/embed/JjNuCHE4EGE?feature=oembed'};
   const ad = serialize(state.ad);
   wrap(state.container);
   assert.equal(state.frame.parent.className, 'js-reframe');
@@ -76,6 +76,16 @@ test('the actual nocookie DOM player retains its attributes and intrinsic ratio 
   const wrapper = state.frame.parent;
   wrap(state.container);
   assert.equal(state.frame.parent, wrapper, 'Repeated activation must not nest wrappers');
+});
+
+test('already-authored nocookie frames keep their original parent and native loading boundary', () => {
+  for (const extra of [{}, {loading: 'lazy'}]) {
+    const state = fixture('https://www.youtube-nocookie.com/embed/JjNuCHE4EGE?feature=oembed', extra);
+    const before = serialize(state.container);
+    wrap(state.container);
+    assert.ok(state.frame.parent === state.figure, 'Reparenting a live iframe recreates its browsing context and can defeat lazy loading');
+    assert.equal(serialize(state.container), before);
+  }
 });
 
 for (const src of [

@@ -14,7 +14,6 @@ export function wrapEmbeds(container) {
 
   var selectors = [
     'iframe[src*="youtube.com"]',
-    'iframe[src*="youtube-nocookie.com"]',
     'iframe[src*="youtu.be"]',
     'iframe[src*="vimeo.com"]',
     'iframe[src*="bilibili.com"]',
