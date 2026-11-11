@@ -123,5 +123,5 @@ test('original links, captions, alt text, and portrait dimensions stay intact', 
 });
 
 test('empty content is safe', () => {
-  setup([]).run();
+  assert.doesNotThrow(() => setup([]).run());
 });
