@@ -19,9 +19,8 @@ for (const [index, workflow] of workflows.entries()) {
       assert.match(match[1], /--frozen-lockfile/);
       assert.match(match[1], /--ignore-scripts/);
     }
-    for (const match of workflow.matchAll(/bunx gscan([^\s]*)/g)) {
-      assert.match(match[1], /^@\d+\.\d+\.\d+$/);
-    }
+    assert.doesNotMatch(workflow, /bunx\s+gscan/);
+    assert.match(workflow, /run: bun scripts\/validate-theme\.js\n/);
   });
 }
 

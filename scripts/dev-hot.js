@@ -51,7 +51,7 @@ const watchFiles = [
 console.log('\n========================================');
 console.log('  Attegi Hot Dev Server');
 console.log('========================================');
-console.log(`  Proxy target: ${ghostUrl}`);
+console.log('  Proxy target: configured Ghost URL');
 console.log(`  Hot URL:      ${hotProtocol}://localhost:${hotPort}`);
 console.log(`  Local assets: ${useLocalAssets ? 'enabled' : 'disabled'}`);
 console.log('  Watching:     assets + hbs + locales');
@@ -60,6 +60,7 @@ console.log('========================================\n');
 browserSync.init(
   {
     proxy: ghostUrl,
+    listen: '127.0.0.1',
     serveStatic: useLocalAssets ? [
       {
         route: '/assets',
@@ -82,7 +83,7 @@ browserSync.init(
     }
 
     console.error('\n[hot] Failed to start hot reload proxy.');
-    console.error(`[hot] Could not connect to Ghost at: ${ghostUrl}`);
+    console.error('[hot] Could not connect to the configured Ghost URL.');
     console.error('[hot] Start Ghost first, or set GHOST_DEV_URL to an available URL.\n');
     process.exit(1);
   }

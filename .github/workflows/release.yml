@@ -12,16 +12,27 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
 jobs:
-  release:
+  build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      description: ${{ steps.package.outputs.description }}
+      demo: ${{ steps.package.outputs.demo }}
+      ghost_version: ${{ steps.package.outputs.ghost_version }}
+      size_kb: ${{ steps.package.outputs.size_kb }}
+      summary: ${{ steps.summary.outputs.response }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -33,6 +44,12 @@ jobs:
 
       - name: Test template rendering
         run: bun run test:templates
+
+      - name: Validate publication source
+        run: |
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse HEAD)" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse refs/remotes/origin/main)" ]]
 
       - name: Get version
         id: version
@@ -101,13 +118,14 @@ jobs:
           fi
 
           # Save to files for fallback
-          echo "$COMMITS" > /tmp/commits.txt
-          echo "$FILES_CHANGED" > /tmp/files.txt
+          echo "$COMMITS" > "$RUNNER_TEMP/commits.txt"
+          echo "$FILES_CHANGED" > "$RUNNER_TEMP/files.txt"
 
           # Output commits for Copilot action
-          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          DELIMITER=$(cat /proc/sys/kernel/random/uuid)
+          echo "commits<<$DELIMITER" >> "$GITHUB_OUTPUT"
           echo "$COMMITS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "$DELIMITER" >> "$GITHUB_OUTPUT"
 
           # Output for debugging
           echo "📝 Recent commits:"
@@ -117,7 +135,7 @@ jobs:
         id: summary
         run: |
           # Read commits
-          COMMITS=$(cat /tmp/commits.txt)
+          COMMITS=$(cat "$RUNNER_TEMP/commits.txt")
 
           # Categorize commits by conventional commit prefixes
           FEATURES=$(echo "$COMMITS" | grep -iE "^- feat" | sed 's/^- feat[^:]*: /- /' | head -5 || true)
@@ -158,9 +176,10 @@ jobs:
           fi
 
           # Output
-          echo "response<<EOF" >> $GITHUB_OUTPUT
+          DELIMITER=$(cat /proc/sys/kernel/random/uuid)
+          echo "response<<$DELIMITER" >> "$GITHUB_OUTPUT"
           echo "$SUMMARY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "$DELIMITER" >> "$GITHUB_OUTPUT"
 
       - name: Build and package
         run: |
@@ -169,50 +188,89 @@ jobs:
           bun run compress
 
       - name: Validate theme
-        run: bunx gscan@6.7.0 -z dist/attegi.zip
+        run: bun scripts/validate-theme.js
 
       - name: Extract package info
         id: package
         run: |
-          NAME=$(bun -e "console.log(require('./package.json').name)")
-          DESCRIPTION=$(bun -e "console.log(require('./package.json').description)")
-          DEMO=$(bun -e "console.log(require('./package.json').demo)")
-          GHOST_VERSION=$(bun -e "console.log(require('./package.json').engines.ghost)")
-          SIZE_BYTES=$(stat -f%z dist/attegi.zip 2>/dev/null || stat -c%s dist/attegi.zip)
-          SIZE_KB=$((SIZE_BYTES / 1024))
-          echo "name=$NAME" >> $GITHUB_OUTPUT
-          echo "description=$DESCRIPTION" >> $GITHUB_OUTPUT
-          echo "demo=$DEMO" >> $GITHUB_OUTPUT
-          echo "ghost_version=$GHOST_VERSION" >> $GITHUB_OUTPUT
-          echo "size_kb=${SIZE_KB}KB" >> $GITHUB_OUTPUT
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          pkg = json.loads(Path('package.json').read_text())
+          values = dict(version=pkg['version'], name=pkg['name'], description=pkg['description'],
+                        demo=pkg['demo'], ghost_version=pkg['engines']['ghost'], license=pkg['license'])
+          if any(not isinstance(value, str) or '\r' in value or '\n' in value for value in values.values()):
+              raise ValueError('Invalid package metadata')
+          if values['name'] != 'attegi' or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', values['version']):
+              raise ValueError('Invalid package identity/version')
+          values['size_kb'] = str(Path('dist/attegi.zip').stat().st_size // 1024) + 'KB'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(''.join(f'{key}={value}\n' for key, value in values.items()))
+          PY
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: attegi-release
+          path: dist/attegi.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    if: needs.build.result == 'success' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+      RELEASE_TAG: ${{ needs.build.outputs.tag }}
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Recheck publication source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_TAG" == "v$PACKAGE_VERSION" ]]
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          MAIN_REF=refs/heads/main
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/${MAIN_REF#refs/}" --jq .object.sha)
+          [[ "$SOURCE_SHA" == "$MAIN_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+
+      - name: Download release archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: attegi-release
+          path: dist
 
       - name: Create and push tag
-        if: steps.check_tag.outputs.exists == 'false'
         env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
-          git push origin "refs/tags/$RELEASE_TAG"
+          TAG_SHA=$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" -f tag="$RELEASE_TAG" -f message="Release $RELEASE_TAG" -f object="$SOURCE_SHA" -f type=commit --jq .sha)
+          [[ "$TAG_SHA" =~ ^[a-f0-9]{40}$ ]]
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$TAG_SHA"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Attegi for blockdyor ${{ steps.version.outputs.tag }}
+          tag_name: ${{ needs.build.outputs.tag }}
+          name: Attegi for blockdyor ${{ needs.build.outputs.tag }}
           generate_release_notes: true
           draft: false
           prerelease: false
+          fail_on_unmatched_files: true
           files: dist/attegi.zip
           body: |
-            ## 🎨 Attegi for blockdyor ${{ steps.version.outputs.tag }}
+            ## 🎨 Attegi for blockdyor ${{ needs.build.outputs.tag }}
 
-            ${{ steps.package.outputs.description }}
+            ${{ needs.build.outputs.description }}
 
             ### 📝 What's Changed
 
-            ${{ steps.summary.outputs.response }}
+            ${{ needs.build.outputs.summary }}
 
             ### 📥 Installation
 
@@ -223,7 +281,7 @@ jobs:
 
             ### 🔗 Links
 
-            - **Live Demo**: ${{ steps.package.outputs.demo }}
+            - **Live Demo**: ${{ needs.build.outputs.demo }}
             - **Documentation**: [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
             - **中文文档**: [README_zh.md](https://github.com/${{ github.repository }}/blob/main/README_zh.md)
 
@@ -231,8 +289,8 @@ jobs:
 
             | Item | Value |
             |------|-------|
-            | Size | ${{ steps.package.outputs.size_kb }} |
-            | Ghost Version | ${{ steps.package.outputs.ghost_version }} |
+            | Size | ${{ needs.build.outputs.size_kb }} |
+            | Ghost Version | ${{ needs.build.outputs.ghost_version }} |
             | Validation | ✅ Passed GScan |
             | License | GNU AGPL v3.0 |
 

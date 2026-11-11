@@ -27,33 +27,39 @@ if (!apiUrl || !apiKey) {
   process.exit(1);
 }
 
-const zipFile = Bun.file(zipPath);
-if (!(await zipFile.exists())) {
-  console.error(`[deploy] Theme zip not found: ${zipPath}`);
+try {
+  const adminApiUrl = normalizeAdminApiUrl(apiUrl);
+  const zipFile = Bun.file(zipPath);
+  if (!(await zipFile.exists())) {
+    console.error(`[deploy] Theme zip not found: ${zipPath}`);
+    process.exit(1);
+  }
+
+  const token = createAdminToken(apiKey);
+
+  console.log(`[deploy] Uploading ${zipPath}`);
+  console.log('[deploy] Admin API URL validated.');
+  console.log(`[deploy] Accept-Version: ${ACCEPT_VERSION}`);
+
+  const theme = await uploadTheme({
+    adminApiUrl,
+    token,
+    zipFile,
+    zipPath
+  });
+
+  await activateTheme({
+    adminApiUrl,
+    token,
+    themeName: theme.name
+  });
+
+  console.log(`[deploy] Theme active: ${theme.name}`);
+} catch {
+  // Network and upstream errors can contain credentials or other secrets.
+  console.error('[deploy] Deployment failed. Check configuration and Ghost API availability.');
   process.exit(1);
 }
-
-const adminApiUrl = normalizeAdminApiUrl(apiUrl);
-const token = createAdminToken(apiKey);
-
-console.log(`[deploy] Uploading ${zipPath}`);
-console.log(`[deploy] Admin API: ${adminApiUrl}`);
-console.log(`[deploy] Accept-Version: ${ACCEPT_VERSION}`);
-
-const theme = await uploadTheme({
-  adminApiUrl,
-  token,
-  zipFile,
-  zipPath
-});
-
-await activateTheme({
-  adminApiUrl,
-  token,
-  themeName: theme.name
-});
-
-console.log(`[deploy] Theme active: ${theme.name}`);
 
 function printUsage(exitCode) {
   console.log('Usage: bun scripts/deploy-theme.js <path-to-theme-zip>');
@@ -61,16 +67,25 @@ function printUsage(exitCode) {
 }
 
 function normalizeAdminApiUrl(rawUrl) {
-  const trimmed = trimTrailingSlashes(String(rawUrl).trim());
-  if (!trimmed) {
-    throw new Error('Ghost Admin API URL is empty.');
+  const { URL } = require('node:url');
+  let url;
+  try {
+    url = new URL(String(rawUrl).trim());
+  } catch {
+    throw new Error('Invalid Ghost Admin API URL.');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password ||
+      url.href.includes('?') || url.href.includes('#') ||
+      /^[^:]+:\/\/[^/?#]*@/.test(String(rawUrl).trim())) {
+    throw new Error('Ghost Admin API URL requires HTTPS without userinfo, query, or fragment.');
   }
 
-  if (trimmed.includes('/ghost/api/admin')) {
-    return trimmed.replace(/\/ghost\/api\/admin(?:\/.*)?$/, '/ghost/api/admin');
-  }
-
-  return `${trimmed}/ghost/api/admin`;
+  const pathname = trimTrailingSlashes(url.pathname);
+  const adminPath = pathname.match(/\/ghost\/api\/admin(?:\/|$)/);
+  url.pathname = adminPath
+    ? pathname.slice(0, adminPath.index) + '/ghost/api/admin'
+    : `${pathname}/ghost/api/admin`;
+  return url.href;
 }
 
 function createAdminToken(key) {
@@ -154,8 +169,7 @@ async function parseResponse(response) {
   const payload = text ? safeJsonParse(text) : null;
 
   if (!response.ok) {
-    const message = payload?.errors?.[0]?.message || payload?.message || text || response.statusText;
-    throw new Error(`Ghost API ${response.status}: ${message}`);
+    throw new Error(`Ghost API ${response.status}: request failed.`);
   }
 
   return payload;
