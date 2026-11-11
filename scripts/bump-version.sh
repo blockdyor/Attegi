@@ -12,7 +12,14 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Get current version
-CURRENT_VERSION=$(bun -e "console.log(require('./package.json').version)")
+CURRENT_VERSION=$(bun -e '
+const version = require("./package.json").version;
+if (typeof version !== "string" || version.trim() !== version || !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version)) {
+  console.error("Current version must have the form x.y.z");
+  process.exit(1);
+}
+console.log(version);
+')
 
 echo -e "${GREEN}Current version: ${CURRENT_VERSION}${NC}"
 
@@ -34,18 +41,23 @@ fi
 
 case "$1" in
   major)
-    NEW_VERSION="$((MAJOR + 1)).0.0"
+    NEW_VERSION="$((10#$MAJOR + 1)).0.0"
     ;;
   minor)
-    NEW_VERSION="${MAJOR}.$((MINOR + 1)).0"
+    NEW_VERSION="${MAJOR}.$((10#$MINOR + 1)).0"
     ;;
   patch)
-    NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+    NEW_VERSION="${MAJOR}.${MINOR}.$((10#$PATCH + 1))"
     ;;
   *)
     NEW_VERSION="$1"
     ;;
 esac
+
+if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "New version must have the form x.y.z" >&2
+  exit 1
+fi
 
 echo -e "${GREEN}New version: ${NEW_VERSION}${NC}"
 
@@ -59,11 +71,11 @@ fi
 
 # Update package.json
 echo "Updating package.json..."
-bun -e "
-const pkg = require('./package.json');
-pkg.version = '${NEW_VERSION}';
-await Bun.write('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-"
+NEW_VERSION="$NEW_VERSION" bun -e '
+const pkg = require("./package.json");
+pkg.version = process.env.NEW_VERSION;
+await Bun.write("./package.json", JSON.stringify(pkg, null, 2) + "\n");
+'
 
 echo -e "${GREEN}✓ Version updated to ${NEW_VERSION}${NC}"
 echo ""

@@ -7,14 +7,25 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      description: ${{ steps.package.outputs.description }}
+      demo: ${{ steps.package.outputs.demo }}
+      ghost_version: ${{ steps.package.outputs.ghost_version }}
+      license: ${{ steps.package.outputs.license }}
+      size_kb: ${{ steps.size.outputs.size_kb }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -42,23 +53,36 @@ jobs:
         run: bun run compress
 
       - name: Validate theme with GScan
-        run: bunx gscan@6.7.0 -z dist/attegi.zip
+        run: bun scripts/validate-theme.js
 
       - name: Extract package info
         id: package
         run: |
-          VERSION=$(bun -e "console.log(require('./package.json').version)")
-          NAME=$(bun -e "console.log(require('./package.json').name)")
-          DESCRIPTION=$(bun -e "console.log(require('./package.json').description)")
-          DEMO=$(bun -e "console.log(require('./package.json').demo)")
-          GHOST_VERSION=$(bun -e "console.log(require('./package.json').engines.ghost)")
-          LICENSE=$(bun -e "console.log(require('./package.json').license)")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "name=$NAME" >> $GITHUB_OUTPUT
-          echo "description=$DESCRIPTION" >> $GITHUB_OUTPUT
-          echo "demo=$DEMO" >> $GITHUB_OUTPUT
-          echo "ghost_version=$GHOST_VERSION" >> $GITHUB_OUTPUT
-          echo "license=$LICENSE" >> $GITHUB_OUTPUT
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          pkg = json.loads(Path('package.json').read_text())
+          values = dict(version=pkg['version'], name=pkg['name'], description=pkg['description'],
+                        demo=pkg['demo'], ghost_version=pkg['engines']['ghost'], license=pkg['license'])
+          if any(not isinstance(value, str) or '\r' in value or '\n' in value for value in values.values()):
+              raise ValueError('Invalid package metadata')
+          if values['name'] != 'attegi' or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', values['version']):
+              raise ValueError('Invalid package identity/version')
+          values['size_kb'] = str(Path('dist/attegi.zip').stat().st_size // 1024) + 'KB'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(''.join(f'{key}={value}\n' for key, value in values.items()))
+          PY
+
+      - name: Validate publication source
+        env:
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then exit 0; fi
+          [[ "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$GITHUB_REF" == "refs/tags/v$PACKAGE_VERSION" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse HEAD)" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse refs/remotes/origin/main)" ]]
+          [[ "$GITHUB_SHA" == "$(git rev-parse --verify --end-of-options "$GITHUB_REF^{commit}")" ]]
 
       - name: Check package size
         id: size
@@ -89,18 +113,60 @@ jobs:
           path: dist/artifact
           retention-days: 90
 
-      - name: Create release and attach zip
+      - name: Upload release archive
         if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: attegi-release
+          path: dist/attegi.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    if: needs.build.result == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Recheck publication source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$PACKAGE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_TAG" == "v$PACKAGE_VERSION" ]]
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          MAIN_REF=refs/heads/main
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/${MAIN_REF#refs/}" --jq .object.sha)
+          [[ "$SOURCE_SHA" == "$MAIN_SHA" ]]
+          [[ "$GITHUB_REF" == "refs/tags/$RELEASE_TAG" ]]
+          TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
+          [[ "$SOURCE_SHA" == "$TAG_SHA" ]]
+
+      - name: Download release archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: attegi-release
+          path: dist
+
+      - name: Create release and attach zip
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
-          name: Attegi for blockdyor v${{ steps.package.outputs.version }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Attegi for blockdyor v${{ needs.build.outputs.version }}
+          draft: false
+          prerelease: false
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: dist/attegi.zip
           body: |
-            ## 🎨 Attegi for blockdyor v${{ steps.package.outputs.version }}
+            ## 🎨 Attegi for blockdyor v${{ needs.build.outputs.version }}
 
-            ${{ steps.package.outputs.description }}
+            ${{ needs.build.outputs.description }}
 
             ### 📥 Installation
 
@@ -111,7 +177,7 @@ jobs:
 
             ### 🔗 Links
 
-            - **Live Demo**: ${{ steps.package.outputs.demo }}
+            - **Live Demo**: ${{ needs.build.outputs.demo }}
             - **Documentation**: [README.md](https://github.com/${{ github.repository }}/blob/main/README.md)
             - **中文文档**: [README_zh.md](https://github.com/${{ github.repository }}/blob/main/README_zh.md)
 
@@ -127,10 +193,10 @@ jobs:
 
             ### 📊 Package Info
 
-            - **Size**: ${{ steps.size.outputs.size_kb }}
-            - **Ghost Version**: ${{ steps.package.outputs.ghost_version }}
+            - **Size**: ${{ needs.build.outputs.size_kb }}
+            - **Ghost Version**: ${{ needs.build.outputs.ghost_version }}
             - **Validation**: ✅ Passed GScan
-            - **License**: ${{ steps.package.outputs.license }}
+            - **License**: ${{ needs.build.outputs.license }}
 
             ### 📝 What's Changed
 

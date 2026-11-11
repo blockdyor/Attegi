@@ -18,10 +18,13 @@ permissions:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -38,7 +41,7 @@ jobs:
           bun run compress
 
       - name: Validate theme
-        run: bunx gscan@6.7.0 -z dist/attegi.zip
+        run: bun scripts/validate-theme.js
 
       - name: Upload theme artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -49,13 +52,15 @@ jobs:
           retention-days: 1
 
   deploy-dev:
-    if: ${{ inputs.target == 'dev' || inputs.target == 'both' }}
+    if: github.ref == 'refs/heads/main' && (inputs.target == 'dev' || inputs.target == 'both')
     needs: build
     environment: dev
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -76,13 +81,15 @@ jobs:
         run: bun scripts/deploy-theme.js dist/attegi.zip
 
   deploy-prod:
-    if: ${{ inputs.target == 'prod' || inputs.target == 'both' }}
+    if: github.ref == 'refs/heads/main' && (inputs.target == 'prod' || inputs.target == 'both')
     needs: build
     environment: prod
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2

@@ -4,8 +4,8 @@ const path = require('node:path');
 const {test} = require('node:test');
 
 for (const [file, version] of [
-  ['build.yml', 'v${{ steps.package.outputs.version }}'],
-  ['release.yml', '${{ steps.version.outputs.tag }}']
+  ['build.yml', 'v${{ needs.build.outputs.version }}'],
+  ['release.yml', '${{ needs.build.outputs.tag }}']
 ]) {
   test(`${file} publishes the blockdyor release name before its version`, () => {
     const workflow = fs.readFileSync(path.resolve(__dirname, '../../.github/workflows', file), 'utf8');

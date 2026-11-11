@@ -12,11 +12,13 @@ import { initToggleCards } from '../features/toggle-cards.js';
 import { initPoemCards } from '../features/poem-cards.js';
 import { setupCoverBrightnessDetection } from '../features/cover-detect.js';
 import { setupContentCards } from '../features/content-cards.js';
+import { setupContentImages } from '../features/content-images.js';
 
 onReady(function() {
   var pageContent = qs('.post-content');
   if (!pageContent) return;
 
+  setupContentImages(pageContent);
   detectContentLanguage(pageContent);
   setupContentCards(pageContent);
   initPoemCards();

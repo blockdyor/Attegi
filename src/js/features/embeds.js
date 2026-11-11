@@ -54,12 +54,12 @@ export function wrapEmbeds(container) {
     applyWrapperRatio(wrapper, video.videoWidth + ' / ' + video.videoHeight);
   }
 
-  // youtube-nocookie.com skips third-party cookies/tracking (doubleclick,
-  // googleads) until the viewer actually presses play.
+  // Domain preference only: running after parsing cannot prevent initial requests.
   function useNoCookieDomain(node) {
+    if (node.hasAttribute('srcdoc')) return;
     var src = node.getAttribute('src') || '';
-    if (src.indexOf('youtube.com/embed/') === -1) return;
-    node.setAttribute('src', src.replace('youtube.com/embed/', 'youtube-nocookie.com/embed/'));
+    var replacement = src.replace(/^((?:https?:)?\/\/(?:www\.)?)youtube\.com(?=\/embed\/)/i, '$1youtube-nocookie.com');
+    if (replacement !== src) node.setAttribute('src', replacement);
   }
 
   function wrapNode(node) {

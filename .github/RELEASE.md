@@ -137,7 +137,7 @@ If automated release fails, you can create a release manually:
 
 2. **Validate**
    ```bash
-   bunx gscan -z dist/attegi.zip
+   bun scripts/validate-theme.js
    ```
 
 3. **Create release on GitHub**

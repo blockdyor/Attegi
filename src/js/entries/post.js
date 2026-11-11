@@ -19,11 +19,13 @@ import { detectContentLanguage } from '../features/lang-detect.js';
 import { initToggleCards } from '../features/toggle-cards.js';
 import { setupBackToTop } from '../features/back-to-top.js';
 import { setupContentCards } from '../features/content-cards.js';
+import { setupContentImages } from '../features/content-images.js';
 
 onReady(function() {
   var postContent = qs('.post-content');
   if (!postContent) return;
 
+  setupContentImages(postContent);
   detectContentLanguage(postContent);
   setupContentCards(postContent);
 
