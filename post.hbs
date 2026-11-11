@@ -203,6 +203,7 @@
 {{#contentFor "head"}}
 <link rel="preload"
 	as="image"
+	fetchpriority="high"
 	href="{{img_url feature_image size="xl" quality="50"}}"
 	imagesrcset="{{> "srcset" image=feature_image quality="50" include_xl=true}}"
 	imagesizes="100vw">

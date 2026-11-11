@@ -42,6 +42,16 @@ test('a real post-shaped context emits its responsive cover preload into the lay
   assert.equal(preloadSet, bodySet, 'Preload must select the same resource as the actual cover');
 });
 
+test('the responsive cover preload requests high priority before the eager cover is parsed', () => {
+  const {html, head} = render({feature_image: 'cover.webp'});
+  const preload = head.match(/<link\b[^>]*rel="preload"[^>]*>/)[0];
+  assert.match(preload, /fetchpriority="high"/);
+  const cover = html.match(/<img\s+srcset="[^"]+"[^>]*>/)[0];
+  assert.match(cover, /loading="eager"/);
+  assert.match(cover, /fetchpriority="high"/);
+  assert.equal(preload.match(/imagesrcset="([^"]+)"/)[1], cover.match(/srcset="([^"]+)"/)[1]);
+});
+
 test('preload uses the post image rather than an unrelated root property', () => {
   const {head} = render({feature_image: 'cover.webp'}, 'wrong-root.webp');
   assert.match(head, /\/img\/cover.webp\/xl/);
