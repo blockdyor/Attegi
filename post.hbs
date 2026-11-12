@@ -112,12 +112,12 @@
 				</aside>
 				{{/if}}
 
-					<div class="post-share js-share-native" hidden>
+					<div class="post-share js-share-native" data-share-preference="{{@custom.post_share}}" hidden>
 						<span class="post-info-label">{{t "Share"}}</span>
-						<button aria-label="{{t "Share"}} {{t "Article"}}" class="post-share-button" id="share-button"><span class="icon icon-share" aria-hidden="true">{{> "icons/icon-share"}}</span></button>
+						<button type="button" aria-label="{{t "Share"}} {{t "Article"}}" class="post-share-button" id="share-button"><span class="icon icon-share" aria-hidden="true">{{> "icons/icon-share"}}</span></button>
 					</div>
 
-					<div class="post-share js-share-default" hidden>
+					<div class="post-share js-share-default"{{#match @custom.post_share "=" "Disabled"}} hidden{{/match}}>
 						<span class="post-info-label">{{t "Share"}}</span>
 						<a title="{{t "Twitter"}}" aria-label="{{t "Twitter"}}" class="twitter js-share-popup" data-popup-size="550,235" href="https://twitter.com/share?text={{encode title}}&url={{url absolute="true"}}">
 							<span class="icon icon-x" aria-hidden="true">{{> "icons/icon-x"}}</span>
@@ -134,25 +134,6 @@
 					</div>
 				</div>
 
-				<script>
-				(function() {
-					var sharePref = '{{@custom.post_share}}';
-					var nativeShare = document.querySelector('.js-share-native');
-					var defaultShare = document.querySelector('.js-share-default');
-
-					// Hide both by default
-					if (nativeShare) nativeShare.hidden = true;
-					if (defaultShare) defaultShare.hidden = true;
-
-					// Show only the selected share type
-					if (sharePref === 'Native' && nativeShare) {
-						nativeShare.hidden = false;
-					} else if (sharePref === 'Default' && defaultShare) {
-						defaultShare.hidden = false;
-					}
-					// If sharePref === 'Disabled', both remain hidden
-				})();
-				</script>
 
 			</section>
 
