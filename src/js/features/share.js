@@ -10,22 +10,47 @@ import { doc, qsa } from '../core/index.js';
  */
 export function setupShare() {
   var shareButton = doc.getElementById('share-button');
-  if (!shareButton) return;
+  var nativeShare = doc.querySelector('.js-share-native');
+  var defaultShare = doc.querySelector('.js-share-default');
+  if (!shareButton || !nativeShare || !defaultShare ||
+      nativeShare.getAttribute('data-share-preference') !== 'Native' ||
+      shareButton.getAttribute('data-share-ready') === 'true') return;
 
-  if (!navigator.share) {
-    shareButton.setAttribute('aria-hidden', 'true');
-    shareButton.setAttribute('tabindex', '-1');
-    shareButton.style.display = 'none';
+  function showFallback(focus) {
+    nativeShare.hidden = true;
+    defaultShare.hidden = false;
+    var firstLink = defaultShare.querySelector('a');
+    if (focus && firstLink) firstLink.focus();
+  }
+
+  var data = {title: doc.title, url: window.location.href};
+  try {
+    if (typeof navigator.share !== 'function' ||
+        (typeof navigator.canShare === 'function' && !navigator.canShare(data))) {
+      showFallback(false);
+      return;
+    }
+  } catch {
+    showFallback(false);
     return;
   }
 
-  shareButton.addEventListener('click', function(event) {
+  shareButton.addEventListener('click', async function(event) {
     event.preventDefault();
-    navigator.share({
-      title: doc.title,
-      url: window.location.href
-    })['catch'](function() {});
+    if (shareButton.disabled) return;
+    shareButton.disabled = true;
+    try {
+      await navigator.share(data);
+    } catch {
+      // AbortError also covers missing share targets, not only cancellation.
+      showFallback(true);
+    } finally {
+      shareButton.disabled = false;
+    }
   });
+  shareButton.setAttribute('data-share-ready', 'true');
+  nativeShare.hidden = false;
+  defaultShare.hidden = true;
 }
 
 /**
@@ -38,10 +63,19 @@ export function setupSharePopups() {
   if (!links.length) return;
 
   Array.prototype.forEach.call(links, function(link) {
+    if (link.getAttribute('data-share-popup-ready') === 'true') return;
     link.addEventListener('click', function(event) {
-      event.preventDefault();
       var size = (link.dataset.popupSize || '600,400').split(',');
-      window.open(link.href, 'share-popup', 'width=' + size[0] + ',height=' + size[1]);
+      try {
+        var popup = window.open(link.href, 'share-popup', 'width=' + size[0] + ',height=' + size[1]);
+        if (popup) {
+          popup.opener = null;
+          event.preventDefault();
+        }
+      } catch {
+        // A denied popup must retain the anchor's ordinary navigation.
+      }
     });
+    link.setAttribute('data-share-popup-ready', 'true');
   });
 }
