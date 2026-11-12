@@ -41,9 +41,9 @@ export function setupShare() {
     shareButton.disabled = true;
     try {
       await navigator.share(data);
-    } catch {
-      // AbortError also covers missing share targets, not only cancellation.
-      showFallback(true);
+    } catch (error) {
+      // AbortError also covers missing targets; retain Native to preserve Cancel/Back.
+      if (!error || error.name !== 'AbortError') showFallback(true);
     } finally {
       shareButton.disabled = false;
     }
