@@ -115,9 +115,24 @@ test('synchronous native failure reveals fallback', async () => {
   const state = setup('Native', {share: () => {throw new Error('unsupported');}}); state.init(); await state.click();
   assert.equal(state.native.hidden, true); assert.equal(state.fallback.hidden, false);
 });
-test('AbortError from cancellation or missing targets leaves usable fallback links', async () => {
-  const state = setup('Native', {share: async () => {throw Object.assign(new Error('cancelled'), {name: 'AbortError'});}}); state.init(); await state.click();
-  assert.equal(state.native.hidden, true); assert.equal(state.fallback.hidden, false); assert.equal(state.button.disabled, false);
+test('Cancel or Back retains the native share control without revealing classic links', async () => {
+  const state = setup('Native', {share: async () => {throw Object.assign(new Error('cancelled'), {name: 'AbortError'});}}); state.init(); state.button.focus(); await state.click();
+  assert.equal(state.native.hidden, false); assert.equal(state.fallback.hidden, true); assert.equal(state.button.disabled, false);
+  assert.equal(state.doc.activeElement, state.button);
+});
+test('native sharing can be retried successfully after cancellation', async () => {
+  let calls = 0;
+  const state = setup('Native', {share: async () => {
+    if (++calls === 1) throw Object.assign(new Error('cancelled'), {name: 'AbortError'});
+  }});
+  state.init(); state.init(); await state.click(); await state.click();
+  assert.equal(calls, 2); assert.equal(state.native.hidden, false);
+  assert.equal(state.fallback.hidden, true); assert.equal(state.button.disabled, false);
+});
+test('a missing rejection value still reveals fallback rather than throwing in the handler', async () => {
+  const state = setup('Native', {share: async () => {throw null;}}); state.init(); await state.click();
+  assert.equal(state.native.hidden, true); assert.equal(state.fallback.hidden, false);
+  assert.equal(state.button.disabled, false);
 });
 test('repeated initialization and pending clicks cannot open duplicate dialogs', async () => {
   let resolve; let calls = 0; const state = setup('Native', {share: () => {calls++; return new Promise(done => {resolve = done;});}}); state.init(); state.init();
