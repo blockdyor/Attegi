@@ -213,6 +213,14 @@ The following historical scores are from the [upstream Attegi demo report](https
 
 ---
 
+## Cloudflare Rocket Loader
+
+Attegi keeps its first-paint theme and poem-marker scripts outside Rocket Loader with `data-cfasync="false"`. Main bundles remain deferred and eligible for Rocket Loader; there is no blanket JavaScript bypass. Poem fallback follows actual bundle completion or failure, not native `DOMContentLoaded`. Successful delayed initialization avoids the raw-marker flash; failed bundle/loader resources instead leave the original quote readable, including its marker when conversion cannot run.
+
+Local tests run Cloudflare's real runtime with modeled HTML rewriting. They cover post/page initialization, menu and theme switching, TOC, galleries, highlighting, share cancellation, disabled JavaScript and failed resources. Separate read-only checks use the site's real Ghost Portal/Search scripts: signup/sign-in forms open and search returns results with the loader off/on. No authentication emails or account changes are submitted. Cross-origin fixture image blocking and aborted requests are retained as test limitations, not certified error-free network behavior.
+
+Install the updated theme before enabling Rocket Loader. Then check the actual Cloudflare-served site on desktop/mobile, including your injected scripts, comments and ads, and compare before/after performance. Disable Rocket Loader again if a required feature regresses. Local fixtures do not certify Cloudflare's live HTML rewriting, authenticated flows, every injected script or a dramatic speed improvement; the theme already defers its main JavaScript.
+
 ## Customization
 
 | Setting | Location |

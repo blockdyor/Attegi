@@ -1,9 +1,7 @@
-{{!-- Hide `[!poem]` blockquotes until the deferred bundle turns them into
-     cards, so the raw syntax never paints. Include right after {{content}}
-     so it runs before the parser yields a frame. Deferred scripts run before
-     DOMContentLoaded, so anything still pending then means the bundle failed:
-     show the plain blockquote rather than leave it hidden. data-cfasync
-     keeps Cloudflare Rocket Loader from deferring it past first paint. --}}
+{{!-- Hide raw poem markers before first paint, including while Rocket Loader
+     delays the article bundle beyond native DOMContentLoaded. Observe actual
+     script completion in capture phase: Rocket Loader replaces script nodes,
+     and resource load/error events do not bubble. --}}
 <script data-cfasync="false">
 	(function () {
 		var pending = [];
@@ -14,8 +12,22 @@
 			}
 		});
 		if (!pending.length) return;
-		document.addEventListener('DOMContentLoaded', function () {
+		function revealPending() {
 			pending.forEach(function (q) { q.classList.remove('kg-poem-pending'); });
-		});
+			document.removeEventListener('load', onScriptSettled, true);
+			document.removeEventListener('error', onScriptSettled, true);
+		}
+
+		function onScriptSettled(event) {
+			var script = event.target;
+			if (!script || script.tagName !== 'SCRIPT') return;
+			if (script.hasAttribute('data-highlight') ||
+				(event.type === 'error' && script.hasAttribute('data-cf-settings'))) {
+				revealPending();
+			}
+		}
+
+		document.addEventListener('load', onScriptSettled, true);
+		document.addEventListener('error', onScriptSettled, true);
 	})();
 </script>
